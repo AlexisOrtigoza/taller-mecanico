@@ -5,6 +5,8 @@ vehiculos_bp = Blueprint('vehiculos', __name__)
 
 @vehiculos_bp.route('/nuevo', methods=['GET', 'POST'])
 def nuevo_vehiculo():
+    chapa_inicial = request.args.get('chapa', '')
+    volver_a_orden = request.args.get('volver_a_orden') == '1'
     if request.method == 'POST':
         cliente_id = request.form.get('cliente_id')
         marca = request.form.get('marca')
@@ -43,6 +45,8 @@ def nuevo_vehiculo():
             cursor.close()
             conn.close()
             flash('Vehiculo registrado correctamente.', 'success')
+            if request.args.get('volver_a_orden') == '1':
+                return redirect(url_for('ordenes.nueva_orden'))
             return redirect(url_for('main.dashboard'))
         except Exception as e:
             conn = obtener_conexion()
@@ -62,4 +66,9 @@ def nuevo_vehiculo():
         conn.close()
     except Exception as e:
         clientes = []
-    return render_template('nuevo_vehiculo.html', clientes=clientes)
+    return render_template(
+        'nuevo_vehiculo.html',
+        clientes=clientes,
+        chapa_inicial=chapa_inicial,
+        volver_a_orden=volver_a_orden
+    )

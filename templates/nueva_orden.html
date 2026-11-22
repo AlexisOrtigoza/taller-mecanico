@@ -22,17 +22,65 @@
 
                 <form action="{{ url_for('ordenes.nueva_orden') }}" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    
-                    <!-- Selección del Vehículo -->
-                    <div class="mb-3">
-                        <label for="vehiculo_id" class="form-label fw-bold">Vehículo (Marca, Modelo y Chapa) *</label>
-                        <select class="form-select" id="vehiculo_id" name="vehiculo_id" required>
-                            <option value="" disabled selected>Selecciona un vehículo...</option>
-                            {% for v in vehiculos %}
-                                <option value="{{ v[0] }}">{{ v[1] }} {{ v[2] }} - Chapa: {{ v[3] }} (Dueño: {{ v[4] }})</option>
-                            {% endfor %}
-                        </select>
+                    <input type="hidden" name="vehiculo_id" id="vehiculo_id">
+
+                    <h5 class="text-primary mb-3">1. Identificación del ingreso</h5>
+                    <ul class="nav nav-pills mb-3" id="busqueda-tabs">
+                        <li class="nav-item">
+                            <button type="button" class="nav-link active" data-modo="ci">Buscar por C.I.</button>
+                        </li>
+                        <li class="nav-item">
+                            <button type="button" class="nav-link" data-modo="chapa">Buscar por chapa</button>
+                        </li>
+                    </ul>
+
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <label for="busqueda-ingreso" class="form-label fw-bold" id="label-busqueda">Número de documento</label>
+                            <input type="search" class="form-control form-control-lg" id="busqueda-ingreso"
+                                   autocomplete="off" placeholder="Escribe la C.I. del cliente">
+                            <div id="lista-resultados" class="list-group mt-2"></div>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            <button type="button" class="btn btn-outline-secondary w-100 mb-0" id="btn-sin-registro">
+                                Continuar sin registro
+                            </button>
+                        </div>
                     </div>
+
+                    <div id="vehiculo-seleccionado" class="alert alert-success mt-3 d-none"></div>
+
+                    <div id="datos-sin-registro" class="card border-warning mt-3 d-none">
+                        <div class="card-header bg-warning-subtle fw-bold">Datos del vehículo no registrado</div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label for="marca" class="form-label">Marca *</label>
+                                    <input type="text" class="form-control" id="marca" name="marca" placeholder="Ej: Toyota">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label for="modelo" class="form-label">Modelo *</label>
+                                    <input type="text" class="form-control" id="modelo" name="modelo" placeholder="Ej: Hilux">
+                                </div>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-4 mb-3">
+                                    <label for="chapa" class="form-label">Chapa *</label>
+                                    <input type="text" class="form-control" id="chapa" name="chapa" placeholder="Ej: ABC 123">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="anio" class="form-label">Año</label>
+                                    <input type="number" class="form-control" id="anio" name="anio" min="1900" max="2100">
+                                </div>
+                                <div class="col-md-4 mb-3">
+                                    <label for="kilometraje" class="form-label">Kilometraje</label>
+                                    <input type="number" class="form-control" id="kilometraje" name="kilometraje" min="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="my-4">
 
                     <!-- Síntoma o Diagnóstico inicial -->
                     <div class="mb-3">
@@ -106,6 +154,207 @@
 
     <!-- SCRIPT DE INTELIGENCIA DE CAJA Y NAVEGACIÓN CON ENTER -->
     <script>
+        let modoBusqueda = 'ci';
+        let temporizadorBusqueda;
+
+        const inputBusqueda = document.getElementById('busqueda-ingreso');
+        const listaResultados = document.getElementById('lista-resultados');
+        const vehiculoSeleccionado = document.getElementById('vehiculo-seleccionado');
+        const datosSinRegistro = document.getElementById('datos-sin-registro');
+        const vehiculoId = document.getElementById('vehiculo_id');
+
+        function limpiarSeleccion() {
+            vehiculoId.value = '';
+            vehiculoSeleccionado.classList.add('d-none');
+            vehiculoSeleccionado.textContent = '';
+        }
+
+        function seleccionarVehiculo(id, descripcion) {
+            vehiculoId.value = id;
+            datosSinRegistro.classList.add('d-none');
+            vehiculoSeleccionado.textContent = `Vehículo seleccionado: ${descripcion}`;
+            vehiculoSeleccionado.classList.remove('d-none');
+            listaResultados.innerHTML = '';
+        }
+
+        function mostrarSinRegistro(prefillChapa = '') {
+            limpiarSeleccion();
+            datosSinRegistro.classList.remove('d-none');
+            if (prefillChapa) {
+                document.getElementById('chapa').value = prefillChapa;
+            }
+            document.getElementById('marca').focus();
+        }
+
+        function buscarCliente() {
+            const termino = inputBusqueda.value.trim();
+            listaResultados.innerHTML = '';
+            limpiarSeleccion();
+            if (termino.length < 1) return;
+
+            fetch(`{{ url_for('ordenes.buscar_clientes') }}?q=${encodeURIComponent(termino)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.clientes || data.clientes.length === 0) {
+                        if (termino.length >= 3) {
+                            const caja = document.createElement('div');
+                            caja.className = 'list-group-item';
+                            const texto = document.createElement('p');
+                            texto.className = 'mb-2';
+                            texto.textContent = 'No se encontró un cliente registrado.';
+                            const acciones = document.createElement('div');
+                            acciones.className = 'd-flex gap-2';
+
+                            const registrar = document.createElement('a');
+                            registrar.className = 'btn btn-primary btn-sm';
+                            registrar.textContent = 'Sí, registrar cliente';
+                            registrar.href = `{{ url_for('clientes.nuevo_cliente') }}?cedula=${encodeURIComponent(termino)}&volver_a_orden=1`;
+
+                            const continuar = document.createElement('button');
+                            continuar.type = 'button';
+                            continuar.className = 'btn btn-outline-secondary btn-sm';
+                            continuar.textContent = 'No, cargar sin registrar';
+                            continuar.addEventListener('click', () => mostrarSinRegistro());
+
+                            acciones.append(registrar, continuar);
+                            caja.append(texto, acciones);
+                            listaResultados.append(caja);
+                        }
+                        return;
+                    }
+
+                    data.clientes.forEach(cliente => {
+                        const boton = document.createElement('button');
+                        boton.type = 'button';
+                        boton.className = 'list-group-item list-group-item-action';
+                        boton.textContent = `CI ${cliente.cedula} - ${cliente.nombre} ${cliente.apellido}${cliente.telefono ? ` · ${cliente.telefono}` : ''}`;
+                        boton.addEventListener('click', () => cargarVehiculosCliente(cliente.id));
+                        listaResultados.append(boton);
+                    });
+                })
+                .catch(() => {
+                    listaResultados.innerHTML = '<div class="list-group-item text-danger">No se pudo realizar la búsqueda.</div>';
+                });
+        }
+
+        function cargarVehiculosCliente(clienteId) {
+            fetch(`{{ url_for('ordenes.vehiculos_cliente', cliente_id=0) }}`.replace('/0', `/${clienteId}`))
+                .then(response => response.json())
+                .then(data => {
+                    listaResultados.innerHTML = '';
+                    if (!data.vehiculos || data.vehiculos.length === 0) {
+                        const caja = document.createElement('div');
+                        caja.className = 'list-group-item';
+                        caja.textContent = 'El cliente está registrado, pero aún no tiene vehículos.';
+                        listaResultados.append(caja);
+                        return;
+                    }
+                    data.vehiculos.forEach(vehiculo => {
+                        const boton = document.createElement('button');
+                        boton.type = 'button';
+                        boton.className = 'list-group-item list-group-item-action';
+                        boton.textContent = `${vehiculo.marca} ${vehiculo.modelo} - Chapa: ${vehiculo.chapa}${vehiculo.anio ? ` (${vehiculo.anio})` : ''}`;
+                        boton.addEventListener('click', () => seleccionarVehiculo(
+                            vehiculo.id,
+                            `${vehiculo.marca} ${vehiculo.modelo} - ${vehiculo.chapa}`
+                        ));
+                        listaResultados.append(boton);
+                    });
+                });
+        }
+
+        function buscarVehiculoPorChapa() {
+            const termino = inputBusqueda.value.trim();
+            listaResultados.innerHTML = '';
+            limpiarSeleccion();
+            if (termino.length < 2) return;
+
+            fetch(`{{ url_for('ordenes.buscar_vehiculos') }}?q=${encodeURIComponent(termino)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (!data.vehiculos || data.vehiculos.length === 0) {
+                        const caja = document.createElement('div');
+                        caja.className = 'list-group-item';
+                        const texto = document.createElement('p');
+                        texto.className = 'mb-2';
+                        texto.textContent = 'No se encontró un vehículo registrado.';
+                        const acciones = document.createElement('div');
+                        acciones.className = 'd-flex gap-2';
+                        const registrar = document.createElement('a');
+                        registrar.className = 'btn btn-primary btn-sm';
+                        registrar.textContent = 'Sí, registrar vehículo';
+                        registrar.href = `{{ url_for('vehiculos.nuevo_vehiculo') }}?chapa=${encodeURIComponent(termino)}&volver_a_orden=1`;
+                        const continuar = document.createElement('button');
+                        continuar.type = 'button';
+                        continuar.className = 'btn btn-outline-secondary btn-sm';
+                        continuar.textContent = 'No, cargar sin registrar';
+                        continuar.addEventListener('click', () => mostrarSinRegistro(termino));
+                        acciones.append(registrar, continuar);
+                        caja.append(texto, acciones);
+                        listaResultados.append(caja);
+                        return;
+                    }
+
+                    data.vehiculos.forEach(vehiculo => {
+                        const boton = document.createElement('button');
+                        boton.type = 'button';
+                        boton.className = 'list-group-item list-group-item-action';
+                        const propietario = vehiculo.cliente_nombre
+                            ? ` · ${vehiculo.cliente_nombre} ${vehiculo.cliente_apellido}`
+                            : ' · Sin cliente registrado';
+                        boton.textContent = `${vehiculo.marca} ${vehiculo.modelo} - Chapa: ${vehiculo.chapa}${propietario}`;
+                        boton.addEventListener('click', () => seleccionarVehiculo(
+                            vehiculo.id,
+                            `${vehiculo.marca} ${vehiculo.modelo} - ${vehiculo.chapa}`
+                        ));
+                        listaResultados.append(boton);
+                    });
+                });
+        }
+
+        document.querySelectorAll('[data-modo]').forEach(boton => {
+            boton.addEventListener('click', () => {
+                document.querySelectorAll('[data-modo]').forEach(item => item.classList.remove('active'));
+                boton.classList.add('active');
+                modoBusqueda = boton.dataset.modo;
+                inputBusqueda.value = '';
+                listaResultados.innerHTML = '';
+                limpiarSeleccion();
+                document.getElementById('label-busqueda').textContent =
+                    modoBusqueda === 'ci' ? 'Número de documento' : 'Número de chapa';
+                inputBusqueda.placeholder =
+                    modoBusqueda === 'ci' ? 'Escribe la C.I. del cliente' : 'Escribe la chapa del vehículo';
+                inputBusqueda.focus();
+            });
+        });
+
+        inputBusqueda.addEventListener('input', () => {
+            clearTimeout(temporizadorBusqueda);
+            temporizadorBusqueda = setTimeout(
+                modoBusqueda === 'ci' ? buscarCliente : buscarVehiculoPorChapa,
+                250
+            );
+        });
+
+        document.getElementById('btn-sin-registro').addEventListener('click', () => {
+            const termino = inputBusqueda.value.trim();
+            mostrarSinRegistro(modoBusqueda === 'chapa' ? termino : '');
+        });
+
+        document.querySelector('form[action="{{ url_for("ordenes.nueva_orden") }}"]').addEventListener('submit', event => {
+            if (!vehiculoId.value && datosSinRegistro.classList.contains('d-none')) {
+                event.preventDefault();
+                alert('Selecciona un cliente y vehículo, o elige continuar sin registro.');
+            }
+            if (datosSinRegistro.classList.contains('d-none') === false) {
+                const requeridos = ['marca', 'modelo', 'chapa'];
+                if (requeridos.some(id => document.getElementById(id).value.trim() === '')) {
+                    event.preventDefault();
+                    alert('Marca, modelo y chapa son obligatorios.');
+                }
+            }
+        });
+
         // Función para recalcular subtotales y total general
         function calcularTotales() {
             let totalGeneral = 0;

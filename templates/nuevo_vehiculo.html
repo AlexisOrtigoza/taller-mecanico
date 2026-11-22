@@ -19,7 +19,7 @@
                     <div class="alert alert-danger" role="alert">{{ error }}</div>
                 {% endif %}
 
-                <form action="{{ url_for('vehiculos.nuevo_vehiculo') }}" method="POST">
+                <form action="{{ url_for('vehiculos.nuevo_vehiculo', volver_a_orden='1' if volver_a_orden else none) }}" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     
                     <!-- Selección del Dueño (Cliente registrado) -->
@@ -60,7 +60,7 @@
 
                     <div class="mb-3">
                         <label for="chapa" class="form-label">Número de Chapa / Matrícula *</label>
-                        <input type="text" class="form-control" id="chapa" name="chapa" required placeholder="Ej: ABC 123">
+                        <input type="text" class="form-control" id="chapa" name="chapa" required placeholder="Ej: ABC 123" value="{{ chapa_inicial or '' }}">
                     </div>
 
                     <div class="d-flex justify-content-between mt-4">

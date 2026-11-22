@@ -20,7 +20,7 @@
                     <div class="alert alert-danger" role="alert">{{ error }}</div>
                 {% endif %}
 
-                <form action="{{ url_for('clientes.nuevo_cliente') }}" method="POST">
+                <form action="{{ url_for('clientes.nuevo_cliente', volver_a_orden='1' if volver_a_orden else none) }}" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     
                     <!-- Sección Obligatoria -->
@@ -28,7 +28,7 @@
                     
                     <div class="mb-3">
                         <label for="cedula" class="form-label">Número de Cédula *</label>
-                        <input type="text" class="form-control" id="cedula" name="cedula" required placeholder="Ej: 1234567">
+                        <input type="text" class="form-control" id="cedula" name="cedula" required placeholder="Ej: 1234567" value="{{ cedula_inicial or '' }}">
                     </div>
 
                     <div class="row">

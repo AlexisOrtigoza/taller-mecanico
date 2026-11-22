@@ -15,3 +15,15 @@ def obtener_conexion():
         port=os.getenv("DB_PORT", "5432")
     )
     return conexion
+
+
+def permitir_vehiculos_sin_cliente():
+    """Permite cargar órdenes para vehículos cuyo cliente aún no esté registrado."""
+    conexion = obtener_conexion()
+    cursor = conexion.cursor()
+    try:
+        cursor.execute("ALTER TABLE vehiculos ALTER COLUMN cliente_id DROP NOT NULL")
+        conexion.commit()
+    finally:
+        cursor.close()
+        conexion.close()

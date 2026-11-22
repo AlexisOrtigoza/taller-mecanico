@@ -8,12 +8,18 @@ from blueprints.clientes import clientes_bp
 from blueprints.vehiculos import vehiculos_bp
 from blueprints.ordenes import ordenes_bp
 from blueprints.repuestos import repuestos_bp
+from db import permitir_vehiculos_sin_cliente
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.getenv('SECRET_KEY') or secrets.token_hex(32)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', '0') == '1'
+
+try:
+    permitir_vehiculos_sin_cliente()
+except Exception as error:
+    print(f"No se pudo ajustar la tabla vehiculos: {error}")
 
 
 @app.before_request

@@ -7,14 +7,14 @@ ordenes_bp = Blueprint('ordenes', __name__)
 @ordenes_bp.route('/nueva', methods=['GET', 'POST'])
 def nueva_orden():
     if request.method == 'POST':
-        vehiculo_id = request.form.get('vehiculo_id')
+        vehiculo_id = request.form.get('vehiculo_id') or None
         sintoma = request.form.get('sintoma')
         lista_repuestos = request.form.getlist('repuesto_id[]')
         lista_cantidades = request.form.getlist('cantidad[]')
         lista_precios = request.form.getlist('precio_unitario[]')
 
-        if not vehiculo_id or not sintoma or not sintoma.strip():
-            abort(400, 'Debe indicar el vehiculo y el sintoma')
+        if not sintoma or not sintoma.strip():
+            abort(400, 'Debe indicar el sintoma')
         if len(lista_repuestos) != len(lista_cantidades) or len(lista_repuestos) != len(lista_precios):
             abort(400, 'Los datos de repuestos no son validos')
         if not lista_repuestos:
@@ -23,6 +23,29 @@ def nueva_orden():
         try:
             conn = obtener_conexion()
             cursor = conn.cursor()
+
+            if not vehiculo_id:
+                marca = request.form.get('marca', '').strip()
+                modelo = request.form.get('modelo', '').strip()
+                chapa = request.form.get('chapa', '').strip()
+                anio = request.form.get('anio') or None
+                kilometraje = request.form.get('kilometraje') or None
+                if not marca or not modelo or not chapa:
+                    conn.close()
+                    abort(400, 'Debe indicar marca, modelo y chapa del vehiculo')
+
+                cursor.execute("SELECT id FROM vehiculos WHERE UPPER(REPLACE(chapa, ' ', '')) = UPPER(REPLACE(%s, ' ', '')) LIMIT 1", (chapa,))
+                existente = cursor.fetchone()
+                if existente:
+                    vehiculo_id = existente[0]
+                else:
+                    cursor.execute(
+                        "INSERT INTO vehiculos (cliente_id, marca, modelo, anio, chapa, kilometraje) "
+                        "VALUES (NULL, %s, %s, %s, %s, %s) RETURNING id",
+                        (marca, modelo, anio, chapa, kilometraje)
+                    )
+                    vehiculo_id = cursor.fetchone()[0]
+
             query_ot = "INSERT INTO ordenes_trabajo (vehiculo_id, sintoma, estado) VALUES (%s, %s, 'Pendiente') RETURNING id;"
             cursor.execute(query_ot, (vehiculo_id, sintoma))
             orden_id = cursor.fetchone()[0]
@@ -84,6 +107,74 @@ def nueva_orden():
         vehiculos, repuestos = [], []
     return render_template('nueva_orden.html', vehiculos=vehiculos, repuestos=repuestos)
 
+
+@ordenes_bp.route('/buscar-clientes')
+def buscar_clientes():
+    termino = request.args.get('q', '').strip()
+    if len(termino) < 1:
+        return {"clientes": []}
+    try:
+        conn = obtener_conexion()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT id, cedula, nombre, apellido, telefono
+            FROM clientes
+            WHERE cedula ILIKE %s OR nombre ILIKE %s OR apellido ILIKE %s
+            ORDER BY apellido, nombre
+            LIMIT 10
+        """, (f"%{termino}%", f"%{termino}%", f"%{termino}%"))
+        clientes = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return {"clientes": clientes}
+    except Exception as e:
+        return {"error": str(e), "clientes": []}, 500
+
+
+@ordenes_bp.route('/buscar-vehiculos')
+def buscar_vehiculos():
+    termino = request.args.get('q', '').strip()
+    if len(termino) < 1:
+        return {"vehiculos": []}
+    try:
+        conn = obtener_conexion()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT v.id, v.marca, v.modelo, v.chapa, v.anio,
+                   c.id AS cliente_id, c.nombre AS cliente_nombre,
+                   c.apellido AS cliente_apellido, c.cedula AS cliente_cedula
+            FROM vehiculos v
+            LEFT JOIN clientes c ON c.id = v.cliente_id
+            WHERE v.chapa ILIKE %s OR v.marca ILIKE %s OR v.modelo ILIKE %s
+            ORDER BY v.id DESC
+            LIMIT 10
+        """, (f"%{termino}%", f"%{termino}%", f"%{termino}%"))
+        vehiculos = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return {"vehiculos": vehiculos}
+    except Exception as e:
+        return {"error": str(e), "vehiculos": []}, 500
+
+
+@ordenes_bp.route('/vehiculos-cliente/<int:cliente_id>')
+def vehiculos_cliente(cliente_id):
+    try:
+        conn = obtener_conexion()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT id, marca, modelo, chapa, anio
+            FROM vehiculos
+            WHERE cliente_id = %s
+            ORDER BY id DESC
+        """, (cliente_id,))
+        vehiculos = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return {"vehiculos": vehiculos}
+    except Exception as e:
+        return {"error": str(e), "vehiculos": []}, 500
+
 @ordenes_bp.route('/estado/<int:orden_id>', methods=['POST'])
 def cambiar_estado_orden(orden_id):
     nuevo_estado = request.form.get('nuevo_estado')
@@ -136,7 +227,7 @@ def obtener_detalle_orden(id):
                    c.nombre as cliente_nombre, c.apellido as cliente_apellido, c.telefono as cliente_tel
             FROM ordenes_trabajo o
             JOIN vehiculos v ON o.vehiculo_id = v.id
-            JOIN clientes c ON v.cliente_id = c.id
+            LEFT JOIN clientes c ON v.cliente_id = c.id
             WHERE o.id = %s
         """
         cursor.execute(query_cabecera, (id,))

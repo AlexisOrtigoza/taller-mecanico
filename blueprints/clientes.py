@@ -5,6 +5,8 @@ clientes_bp = Blueprint('clientes', __name__)
 
 @clientes_bp.route('/nuevo', methods=['GET', 'POST'])
 def nuevo_cliente():
+    cedula_inicial = request.args.get('cedula', '')
+    volver_a_orden = request.args.get('volver_a_orden') == '1'
     if request.method == 'POST':
         cedula = request.form.get('cedula')
         nombre = request.form.get('nombre')
@@ -32,8 +34,14 @@ def nuevo_cliente():
             cursor.close()
             conn.close()
             flash('Cliente registrado correctamente.', 'success')
+            if request.args.get('volver_a_orden') == '1':
+                return redirect(url_for('ordenes.nueva_orden'))
             return redirect(url_for('main.dashboard'))
         except Exception as e:
             return render_template('nuevo_cliente.html', error=f"Error al registrar: {e}")
             
-    return render_template('nuevo_cliente.html')
+    return render_template(
+        'nuevo_cliente.html',
+        cedula_inicial=cedula_inicial,
+        volver_a_orden=volver_a_orden
+    )
