@@ -12,7 +12,7 @@
         <div class="card shadow-sm">
             <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
                 <h4 class="mb-0">🔧 Registrar Nueva Orden de Trabajo</h4>
-                <a href="/" class="btn btn-outline-light btn-sm">Volver al Dashboard</a>
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-light btn-sm">Volver al Dashboard</a>
             </div>
             <div class="card-body">
                 
@@ -20,7 +20,7 @@
                     <div class="alert alert-danger" role="alert">{{ error }}</div>
                 {% endif %}
 
-                <form action="/ordenes/nueva" method="POST">
+                <form action="{{ url_for('ordenes.nueva_orden') }}" method="POST">
                     
                     <!-- Selección del Vehículo -->
                     <div class="mb-3">

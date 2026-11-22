@@ -20,7 +20,7 @@
                     <div class="alert alert-danger" role="alert">{{ error }}</div>
                 {% endif %}
 
-                <form action="/clientes/nuevo" method="POST">
+                <form action="{{ url_for('clientes.nuevo_cliente') }}" method="POST">
                     
                     <!-- Sección Obligatoria -->
                     <h5 class="text-primary mb-3">Datos Obligatorios</h5>
@@ -74,7 +74,7 @@
 
                     <!-- Botones de acción -->
                     <div class="d-flex justify-content-between mt-4">
-                        <a href="/" class="btn btn-secondary">Volver al Dashboard</a>
+                        <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">Volver al Dashboard</a>
                         <button type="submit" class="btn btn-primary">Guardar Cliente</button>
                     </div>
 
