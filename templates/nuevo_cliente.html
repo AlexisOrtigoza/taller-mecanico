@@ -20,7 +20,7 @@
                     <div class="alert alert-danger" role="alert">{{ error }}</div>
                 {% endif %}
 
-                <form action="{{ url_for('clientes.nuevo_cliente', volver_a_orden='1' if volver_a_orden else none) }}" method="POST">
+                <form action="{{ url_for('clientes.nuevo_cliente', volver_a_orden='1' if volver_a_orden else none, volver_a_vehiculo='1' if volver_a_vehiculo else none, retorno_chapa='1' if retorno_chapa else none, vehiculo_id=vehiculo_id_regreso if retorno_chapa else none, chapa=datos_vehiculo.chapa if volver_a_vehiculo or retorno_chapa else none, marca=datos_vehiculo.marca if volver_a_vehiculo else none, modelo=datos_vehiculo.modelo if volver_a_vehiculo else none, anio=datos_vehiculo.anio if volver_a_vehiculo else none, kilometraje=datos_vehiculo.kilometraje if volver_a_vehiculo else none) }}" method="POST">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     
                     <!-- Sección Obligatoria -->

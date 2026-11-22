@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clientes - Taller Mecánico</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+    <div class="container py-4">
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h2 class="mb-0">Clientes</h2>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('main.dashboard') }}" class="btn btn-outline-secondary">Dashboard</a>
+                <a href="{{ url_for('clientes.nuevo_cliente') }}" class="btn btn-success">+ Registrar cliente</a>
+            </div>
+        </div>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }}" role="alert">{{ message }}</div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <form method="GET" class="card card-body mb-3">
+            <div class="input-group">
+                <input type="search" class="form-control" name="buscar" value="{{ busqueda }}" placeholder="Buscar por C.I., nombre o teléfono">
+                <button class="btn btn-dark" type="submit">Buscar</button>
+            </div>
+        </form>
+
+        <div class="card shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>C.I.</th>
+                            <th>Cliente</th>
+                            <th>Teléfono</th>
+                            <th>Ciudad / Barrio</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cliente in clientes %}
+                        <tr>
+                            <td>{{ cliente.cedula }}</td>
+                            <td>{{ cliente.nombre }} {{ cliente.apellido }}</td>
+                            <td>{{ cliente.telefono }}</td>
+                            <td>{{ cliente.ciudad or '—' }}{% if cliente.barrio %} / {{ cliente.barrio }}{% endif %}</td>
+                            <td>
+                                <div class="d-flex gap-2">
+                                    <a class="btn btn-sm btn-outline-primary" href="{{ url_for('clientes.editar_cliente', cliente_id=cliente.id) }}">Modificar</a>
+                                    <form method="POST" action="{{ url_for('clientes.eliminar_cliente', cliente_id=cliente.id) }}" onsubmit="return confirm('¿Eliminar este cliente? Sus vehículos se conservarán.');">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                        <button class="btn btn-sm btn-outline-danger" type="submit" {% if cliente.ordenes_count %}disabled title="Tiene órdenes registradas"{% endif %}>Eliminar</button>
+                                    </form>
+                                </div>
+                                {% if cliente.ordenes_count %}
+                                    <small class="text-muted">No se puede eliminar: tiene órdenes registradas.</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr><td colspan="5" class="text-center text-muted py-4">No hay clientes para mostrar.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

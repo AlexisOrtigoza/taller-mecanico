@@ -18,11 +18,29 @@ def obtener_conexion():
 
 
 def permitir_vehiculos_sin_cliente():
-    """Permite cargar órdenes para vehículos cuyo cliente aún no esté registrado."""
+    """Prepara vehículos para no registrados y para relaciones con varios clientes."""
     conexion = obtener_conexion()
     cursor = conexion.cursor()
     try:
         cursor.execute("ALTER TABLE vehiculos ALTER COLUMN cliente_id DROP NOT NULL")
+        cursor.execute("""
+            ALTER TABLE ordenes_trabajo
+            ADD COLUMN IF NOT EXISTS kilometraje_ingreso INTEGER
+        """)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS vehiculo_clientes (
+                vehiculo_id INTEGER NOT NULL REFERENCES vehiculos(id) ON DELETE CASCADE,
+                cliente_id INTEGER NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
+                PRIMARY KEY (vehiculo_id, cliente_id)
+            )
+        """)
+        cursor.execute("""
+            INSERT INTO vehiculo_clientes (vehiculo_id, cliente_id)
+            SELECT id, cliente_id
+            FROM vehiculos
+            WHERE cliente_id IS NOT NULL
+            ON CONFLICT (vehiculo_id, cliente_id) DO NOTHING
+        """)
         conexion.commit()
     finally:
         cursor.close()

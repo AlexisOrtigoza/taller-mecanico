@@ -8,6 +8,7 @@ ordenes_bp = Blueprint('ordenes', __name__)
 def nueva_orden():
     if request.method == 'POST':
         vehiculo_id = request.form.get('vehiculo_id') or None
+        cliente_id_registro = request.form.get('cliente_id') or None
         sintoma = request.form.get('sintoma')
         lista_repuestos = request.form.getlist('repuesto_id[]')
         lista_cantidades = request.form.getlist('cantidad[]')
@@ -19,23 +20,37 @@ def nueva_orden():
             abort(400, 'Los datos de repuestos no son validos')
         if not lista_repuestos:
             abort(400, 'Debe agregar al menos un repuesto o servicio')
+
+        kilometraje_formulario = request.form.get(
+            'kilometraje_ingreso' if vehiculo_id else 'kilometraje'
+        )
+        try:
+            kilometraje_ingreso = int(kilometraje_formulario)
+        except (TypeError, ValueError):
+            abort(400, 'Debe indicar el kilometraje actual del vehículo')
+        if kilometraje_ingreso < 0:
+            abort(400, 'El kilometraje no puede ser negativo')
         
         try:
             conn = obtener_conexion()
             cursor = conn.cursor()
+            vehiculo_nuevo = False
 
             if not vehiculo_id:
                 marca = request.form.get('marca', '').strip()
                 modelo = request.form.get('modelo', '').strip()
                 chapa = request.form.get('chapa', '').strip()
                 anio = request.form.get('anio') or None
-                kilometraje = request.form.get('kilometraje') or None
-                cliente_id_registro = request.form.get('cliente_id') or None
                 if not marca or not modelo or not chapa:
                     conn.close()
                     abort(400, 'Debe indicar marca, modelo y chapa del vehiculo')
 
-                cursor.execute("SELECT id FROM vehiculos WHERE UPPER(REPLACE(chapa, ' ', '')) = UPPER(REPLACE(%s, ' ', '')) LIMIT 1", (chapa,))
+                cursor.execute("""
+                    SELECT id FROM vehiculos
+                    WHERE UPPER(REPLACE(REPLACE(chapa, ' ', ''), '-', '')) =
+                          UPPER(REPLACE(REPLACE(%s, ' ', ''), '-', ''))
+                    LIMIT 1
+                """, (chapa,))
                 existente = cursor.fetchone()
                 if existente:
                     vehiculo_id = existente[0]
@@ -43,12 +58,43 @@ def nueva_orden():
                     cursor.execute(
                         "INSERT INTO vehiculos (cliente_id, marca, modelo, anio, chapa, kilometraje) "
                         "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-                        (cliente_id_registro, marca, modelo, anio, chapa, kilometraje)
+                        (cliente_id_registro, marca, modelo, anio, chapa, kilometraje_ingreso)
                     )
                     vehiculo_id = cursor.fetchone()[0]
+                    vehiculo_nuevo = True
 
-            query_ot = "INSERT INTO ordenes_trabajo (vehiculo_id, sintoma, estado) VALUES (%s, %s, 'Pendiente') RETURNING id;"
-            cursor.execute(query_ot, (vehiculo_id, sintoma))
+            if not vehiculo_nuevo:
+                cursor.execute("SELECT kilometraje FROM vehiculos WHERE id = %s FOR UPDATE", (vehiculo_id,))
+                lectura_anterior = cursor.fetchone()
+                if not lectura_anterior:
+                    conn.rollback()
+                    cursor.close()
+                    conn.close()
+                    return "El vehículo seleccionado ya no existe", 400
+                if lectura_anterior[0] is not None and kilometraje_ingreso < lectura_anterior[0]:
+                    conn.rollback()
+                    cursor.close()
+                    conn.close()
+                    return "El kilometraje nuevo no puede ser menor al último registrado", 400
+                cursor.execute(
+                    "UPDATE vehiculos SET kilometraje = %s WHERE id = %s",
+                    (kilometraje_ingreso, vehiculo_id)
+                )
+
+            if cliente_id_registro:
+                cursor.execute("""
+                    INSERT INTO vehiculo_clientes (vehiculo_id, cliente_id)
+                    VALUES (%s, %s)
+                    ON CONFLICT (vehiculo_id, cliente_id) DO NOTHING
+                """, (vehiculo_id, cliente_id_registro))
+
+            query_ot = """
+                INSERT INTO ordenes_trabajo
+                    (vehiculo_id, sintoma, estado, kilometraje_ingreso)
+                VALUES (%s, %s, 'Pendiente', %s)
+                RETURNING id
+            """
+            cursor.execute(query_ot, (vehiculo_id, sintoma, kilometraje_ingreso))
             orden_id = cursor.fetchone()[0]
             
             costo_acumulado = 0
@@ -87,26 +133,88 @@ def nueva_orden():
         except Exception as e:
             conn = obtener_conexion()
             cursor = conn.cursor()
-            cursor.execute("SELECT v.id, v.marca, v.modelo, v.chapa, c.nombre || ' ' || c.apellido FROM vehiculos v JOIN clientes c ON v.cliente_id = c.id;")
+            cursor.execute("""
+                SELECT v.id, v.marca, v.modelo, v.chapa,
+                       COALESCE(
+                           (SELECT string_agg(c.nombre || ' ' || c.apellido, ', ')
+                            FROM vehiculo_clientes vc JOIN clientes c ON c.id = vc.cliente_id
+                            WHERE vc.vehiculo_id = v.id),
+                           'Sin cliente registrado'
+                       )
+                FROM vehiculos v
+            """)
             vehiculos = cursor.fetchall()
             cursor.execute("SELECT id, nombre, stock_actual, precio_unitario FROM repuestos;")
             repuestos = cursor.fetchall()
             cursor.close()
             conn.close()
-            return render_template('nueva_orden.html', vehiculos=vehiculos, repuestos=repuestos, error=f"Error al registrar la orden: {e}")
+            return render_template(
+                'nueva_orden.html',
+                vehiculos=vehiculos,
+                repuestos=repuestos,
+                cliente_inicial=None,
+                vehiculo_inicial=None,
+                modo_busqueda_inicial='ci',
+                chapa_inicial='',
+                error=f"Error al registrar la orden: {e}"
+            )
             
     try:
         conn = obtener_conexion()
         cursor = conn.cursor()
-        cursor.execute("SELECT v.id, v.marca, v.modelo, v.chapa, c.nombre || ' ' || c.apellido FROM vehiculos v JOIN clientes c ON v.cliente_id = c.id ORDER BY v.id DESC;")
+        cursor.execute("""
+            SELECT v.id, v.marca, v.modelo, v.chapa,
+                   COALESCE(
+                       (SELECT string_agg(c.nombre || ' ' || c.apellido, ', ')
+                        FROM vehiculo_clientes vc JOIN clientes c ON c.id = vc.cliente_id
+                        WHERE vc.vehiculo_id = v.id),
+                       'Sin cliente registrado'
+                   )
+            FROM vehiculos v
+            ORDER BY v.id DESC
+        """)
         vehiculos = cursor.fetchall()
         cursor.execute("SELECT id, nombre, stock_actual, precio_unitario FROM repuestos ORDER BY nombre;")
         repuestos = cursor.fetchall()
+        cliente_inicial = None
+        vehiculo_inicial = None
+        try:
+            cliente_id_inicial = int(request.args.get('cliente_id', ''))
+        except (TypeError, ValueError):
+            cliente_id_inicial = None
+        try:
+            vehiculo_id_inicial = int(request.args.get('vehiculo_id', ''))
+        except (TypeError, ValueError):
+            vehiculo_id_inicial = None
+        cursor_detalle = conn.cursor(cursor_factory=RealDictCursor)
+        if cliente_id_inicial:
+            cursor_detalle.execute(
+                "SELECT id, cedula, nombre, apellido FROM clientes WHERE id = %s",
+                (cliente_id_inicial,)
+            )
+            cliente_inicial = cursor_detalle.fetchone()
+        if vehiculo_id_inicial:
+            cursor_detalle.execute("""
+                SELECT id, marca, modelo, chapa, kilometraje
+                FROM vehiculos WHERE id = %s
+            """, (vehiculo_id_inicial,))
+            vehiculo_inicial = cursor_detalle.fetchone()
+        cursor_detalle.close()
         cursor.close()
         conn.close()
     except Exception as e:
         vehiculos, repuestos = [], []
-    return render_template('nueva_orden.html', vehiculos=vehiculos, repuestos=repuestos)
+        cliente_inicial = None
+        vehiculo_inicial = None
+    return render_template(
+        'nueva_orden.html',
+        vehiculos=vehiculos,
+        repuestos=repuestos,
+        cliente_inicial=cliente_inicial,
+        vehiculo_inicial=vehiculo_inicial,
+        modo_busqueda_inicial=request.args.get('modo_busqueda', 'ci'),
+        chapa_inicial=request.args.get('chapa', '')
+    )
 
 
 @ordenes_bp.route('/buscar-clientes')
@@ -141,12 +249,13 @@ def buscar_vehiculos():
         conn = obtener_conexion()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("""
-            SELECT v.id, v.marca, v.modelo, v.chapa, v.anio,
-                   c.id AS cliente_id, c.nombre AS cliente_nombre,
-                   c.apellido AS cliente_apellido, c.cedula AS cliente_cedula
+            SELECT v.id, v.marca, v.modelo, v.chapa, v.anio, v.kilometraje,
+                   COALESCE(string_agg(DISTINCT c.nombre || ' ' || c.apellido, ', '), 'Sin cliente registrado') AS clientes
             FROM vehiculos v
-            LEFT JOIN clientes c ON c.id = v.cliente_id
+            LEFT JOIN vehiculo_clientes vc ON vc.vehiculo_id = v.id
+            LEFT JOIN clientes c ON c.id = vc.cliente_id
             WHERE v.chapa ILIKE %s OR v.marca ILIKE %s OR v.modelo ILIKE %s
+            GROUP BY v.id
             ORDER BY v.id DESC
             LIMIT 10
         """, (f"%{termino}%", f"%{termino}%", f"%{termino}%"))
@@ -164,10 +273,11 @@ def vehiculos_cliente(cliente_id):
         conn = obtener_conexion()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         cursor.execute("""
-            SELECT id, marca, modelo, chapa, anio
-            FROM vehiculos
-            WHERE cliente_id = %s
-            ORDER BY id DESC
+            SELECT v.id, v.marca, v.modelo, v.chapa, v.anio, v.kilometraje
+            FROM vehiculos v
+            JOIN vehiculo_clientes vc ON vc.vehiculo_id = v.id
+            WHERE vc.cliente_id = %s
+            ORDER BY v.id DESC
         """, (cliente_id,))
         vehiculos = cursor.fetchall()
         cursor.close()
@@ -225,10 +335,17 @@ def obtener_detalle_orden(id):
         cursor = conn.cursor(cursor_factory=RealDictCursor)
         query_cabecera = """
             SELECT o.*, v.marca, v.modelo, v.chapa, v.anio, v.kilometraje,
-                   c.nombre as cliente_nombre, c.apellido as cliente_apellido, c.telefono as cliente_tel
+                   COALESCE(c.clientes, 'Sin cliente asociado') AS cliente_nombre,
+                   '' AS cliente_apellido, c.telefonos AS cliente_tel
             FROM ordenes_trabajo o
             JOIN vehiculos v ON o.vehiculo_id = v.id
-            LEFT JOIN clientes c ON v.cliente_id = c.id
+            LEFT JOIN LATERAL (
+                SELECT string_agg(DISTINCT cl.nombre || ' ' || cl.apellido, ', ') AS clientes,
+                       string_agg(DISTINCT cl.telefono, ', ') AS telefonos
+                FROM vehiculo_clientes vc
+                JOIN clientes cl ON cl.id = vc.cliente_id
+                WHERE vc.vehiculo_id = v.id
+            ) c ON TRUE
             WHERE o.id = %s
         """
         cursor.execute(query_cabecera, (id,))

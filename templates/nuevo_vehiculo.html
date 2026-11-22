@@ -5,73 +5,312 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Registrar Nuevo Vehículo - Taller Mecánico</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .list-group-item.active {
+            background-color: #e9ecef;
+            border-color: #adb5bd;
+            color: #212529;
+        }
+    </style>
 </head>
 <body class="bg-light">
-
-    <div class="container mt-5" style="max-width: 650px;">
+    <div class="container mt-5 mb-5" style="max-width: 700px;">
         <div class="card shadow-sm">
             <div class="card-header bg-dark text-white">
                 <h4 class="mb-0">🚗 Registrar Nuevo Vehículo</h4>
             </div>
             <div class="card-body">
-                
                 {% if error %}
                     <div class="alert alert-danger" role="alert">{{ error }}</div>
                 {% endif %}
 
-                <form action="{{ url_for('vehiculos.nuevo_vehiculo', volver_a_orden='1' if volver_a_orden else none) }}" method="POST">
+                <form action="{{ url_for('vehiculos.nuevo_vehiculo', volver_a_orden='1' if volver_a_orden else none, chapa=chapa_inicial if cliente_inicial else none, cliente_id=cliente_id_inicial if cliente_inicial else none, marca=datos_iniciales.marca if cliente_inicial else none, modelo=datos_iniciales.modelo if cliente_inicial else none, anio=datos_iniciales.anio if cliente_inicial else none, kilometraje=datos_iniciales.kilometraje if cliente_inicial else none) }}" method="POST" id="form-vehiculo">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                    
-                    <!-- Selección del Dueño (Cliente registrado) -->
+                    <input type="hidden" name="cliente_id" id="cliente_id" value="{{ cliente_id_inicial or '' }}">
+                    <input type="hidden" name="vehiculo_id" id="vehiculo_id">
+
+                    <h5 class="text-primary mb-3">1. Verificar chapa</h5>
                     <div class="mb-3">
-                        <label for="cliente_id" class="form-label">Dueño / Cliente *</label>
-                        <select class="form-select" id="cliente_id" name="cliente_id" required>
-                            <option value="" disabled selected>Selecciona un cliente...</option>
-                            {% for c in clientes %}
-                                <option value="{{ c[0] }}">CI: {{ c[1] }} - {{ c[2] }} {{ c[3] }}</option>
-                            {% endfor %}
-                        </select>
-                        <div class="form-text">Si el cliente no aparece, regístralo primero en la sección de clientes.</div>
+                        <label for="chapa" class="form-label fw-bold">Número de chapa / matrícula *</label>
+                        <input type="search" class="form-control form-control-lg" id="chapa" name="chapa"
+                               required autocomplete="off" placeholder="Ej: ABC 123" value="{{ chapa_inicial or '' }}">
+                        <div class="form-text">Busca coincidencias para evitar registrar el mismo vehículo dos veces.</div>
+                        <div id="resultados-chapa" class="list-group mt-2"></div>
+                        <div id="estado-chapa" class="mt-2" role="status"></div>
                     </div>
 
-                    <hr class="my-3">
-
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="marca" class="form-label">Marca *</label>
-                            <input type="text" class="form-control" id="marca" name="marca" required placeholder="Ej: Toyota">
+                    <div id="campos-vehiculo" class="d-none">
+                        <hr>
+                        <h5 class="text-primary mb-3">2. Datos del vehículo</h5>
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="marca" class="form-label">Marca *</label>
+                                <input type="text" class="form-control" id="marca" name="marca" required placeholder="Ej: Toyota" value="{{ datos_iniciales.marca or '' }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="modelo" class="form-label">Modelo *</label>
+                                <input type="text" class="form-control" id="modelo" name="modelo" required placeholder="Ej: IST" value="{{ datos_iniciales.modelo or '' }}">
+                            </div>
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="modelo" class="form-label">Modelo *</label>
-                            <input type="text" class="form-control" id="modelo" name="modelo" required placeholder="Ej: IST">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <label for="anio" class="form-label">Año</label>
+                                <input type="number" class="form-control" id="anio" name="anio" min="1900" max="2100" placeholder="Ej: 2008" value="{{ datos_iniciales.anio or '' }}">
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="kilometraje" class="form-label">Kilometraje</label>
+                                <input type="number" class="form-control" id="kilometraje" name="kilometraje" min="0" placeholder="Ej: 120000" value="{{ datos_iniciales.kilometraje or '' }}">
+                            </div>
                         </div>
                     </div>
 
-                    <div class="row">
-                        <div class="col-md-6 mb-3">
-                            <label for="anio" class="form-label">Año</label>
-                            <input type="number" class="form-control" id="anio" name="anio" min="1900" max="2100" placeholder="Ej: 2008">
+                    <div id="seccion-cliente" class="d-none">
+                        <hr>
+                        <h5 class="text-primary mb-2">3. Asociar a un cliente <span class="text-muted fs-6">(opcional)</span></h5>
+                        <label for="buscar-cliente" class="form-label">Buscar por número de C.I. o nombre</label>
+                        <input type="search" class="form-control" id="buscar-cliente" autocomplete="off" placeholder="Escribe para buscar un cliente">
+                        <div id="cliente-seleccionado" class="alert alert-info mt-2 mb-0 {% if not cliente_inicial %}d-none{% endif %}" role="status">
+                            {% if cliente_inicial %}
+                                Cliente seleccionado: {{ cliente_inicial.nombre }} {{ cliente_inicial.apellido }} · C.I. {{ cliente_inicial.cedula }}
+                            {% endif %}
                         </div>
-                        <div class="col-md-6 mb-3">
-                            <label for="kilometraje" class="form-label">Kilometraje</label>
-                            <input type="number" class="form-control" id="kilometraje" name="kilometraje" placeholder="Ej: 120000">
+                        <div id="resultados-clientes" class="list-group mt-2"></div>
+                        <div class="d-flex flex-wrap gap-2 mt-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="sin-cliente">Continuar sin asociar cliente</button>
+                            <a class="btn btn-outline-primary btn-sm" id="registrar-cliente"
+                               href="{{ url_for('clientes.nuevo_cliente', volver_a_vehiculo='1', volver_a_orden='1' if volver_a_orden else none) }}">+ Registrar nuevo cliente</a>
                         </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="chapa" class="form-label">Número de Chapa / Matrícula *</label>
-                        <input type="text" class="form-control" id="chapa" name="chapa" required placeholder="Ej: ABC 123" value="{{ chapa_inicial or '' }}">
                     </div>
 
                     <div class="d-flex justify-content-between mt-4">
                         <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary">Volver al Dashboard</a>
-                        <button type="submit" class="btn btn-primary">Guardar Vehículo</button>
+                        <button type="submit" class="btn btn-primary" id="guardar-vehiculo" disabled>Guardar Vehículo</button>
                     </div>
-
                 </form>
             </div>
         </div>
     </div>
 
+    <script>
+        const chapaInput = document.getElementById('chapa');
+        const resultadosChapa = document.getElementById('resultados-chapa');
+        const estadoChapa = document.getElementById('estado-chapa');
+        const camposVehiculo = document.getElementById('campos-vehiculo');
+        const seccionCliente = document.getElementById('seccion-cliente');
+        const guardarVehiculo = document.getElementById('guardar-vehiculo');
+        const clienteId = document.getElementById('cliente_id');
+        const vehiculoId = document.getElementById('vehiculo_id');
+        const buscarCliente = document.getElementById('buscar-cliente');
+        const resultadosClientes = document.getElementById('resultados-clientes');
+        const clienteSeleccionado = document.getElementById('cliente-seleccionado');
+        const linkRegistrarCliente = document.getElementById('registrar-cliente');
+        let temporizadorChapa;
+        let temporizadorCliente;
+        let indiceActivo = -1;
+        let chapaVerificada = false;
+        let vehiculoExistente = false;
+
+        function actualizarBotonGuardar() {
+            guardarVehiculo.disabled = !chapaVerificada || (vehiculoExistente && !clienteId.value);
+            guardarVehiculo.textContent = vehiculoExistente ? 'Asociar vehículo existente' : 'Guardar Vehículo';
+        }
+
+        function bloquearRegistro(mensaje) {
+            camposVehiculo.classList.add('d-none');
+            seccionCliente.classList.add('d-none');
+            chapaVerificada = false;
+            vehiculoExistente = false;
+            vehiculoId.value = '';
+            actualizarBotonGuardar();
+            estadoChapa.innerHTML = '';
+            if (mensaje) {
+                const aviso = document.createElement('div');
+                aviso.className = 'alert alert-warning mb-0';
+                aviso.textContent = mensaje;
+                estadoChapa.append(aviso);
+            }
+        }
+
+        function buscarChapa() {
+            const chapa = chapaInput.value.trim();
+            resultadosChapa.replaceChildren();
+            bloquearRegistro('');
+            if (chapa.length < 2) return;
+
+            estadoChapa.textContent = 'Buscando chapa...';
+            fetch(`{{ url_for('vehiculos.buscar_vehiculo_por_chapa') }}?q=${encodeURIComponent(chapa)}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('No se pudo consultar la chapa.');
+                    return response.json();
+                })
+                .then(data => {
+                    if (chapaInput.value.trim() !== chapa) return;
+                    estadoChapa.textContent = '';
+                    data.vehiculos.forEach(vehiculo => {
+                        const item = document.createElement('div');
+                        item.className = 'list-group-item';
+                        const propietario = vehiculo.clientes
+                            ? ` · Clientes: ${vehiculo.clientes}`
+                            : ' · Sin cliente asociado';
+                        item.textContent = `${vehiculo.chapa} — ${vehiculo.marca} ${vehiculo.modelo}${propietario}`;
+                        resultadosChapa.append(item);
+                    });
+
+                    if (data.coincidencia_exacta) {
+                        const encontrado = data.vehiculos.find(vehiculo =>
+                            vehiculo.chapa.replace(/[\s-]/g, '').toUpperCase() === chapa.replace(/[\s-]/g, '').toUpperCase()
+                        );
+                        if (!encontrado) {
+                            bloquearRegistro('La chapa ya está registrada, pero no se pudo cargar el vehículo. Intenta buscarla nuevamente.');
+                            return;
+                        }
+                        chapaVerificada = true;
+                        vehiculoExistente = true;
+                        vehiculoId.value = encontrado.id;
+                        camposVehiculo.classList.add('d-none');
+                        seccionCliente.classList.remove('d-none');
+                        actualizarBotonGuardar();
+                        estadoChapa.textContent = 'Este vehículo ya está registrado. Elige un cliente para asociarlo sin crear un duplicado.';
+                        return;
+                    }
+
+                    chapaVerificada = true;
+                    vehiculoExistente = false;
+                    vehiculoId.value = '';
+                    camposVehiculo.classList.remove('d-none');
+                    seccionCliente.classList.remove('d-none');
+                    actualizarBotonGuardar();
+                    if (data.vehiculos.length) {
+                        estadoChapa.textContent = 'Hay chapas parecidas, pero no una coincidencia exacta. Verifica antes de guardar.';
+                    } else {
+                        estadoChapa.textContent = 'No encontramos esta chapa. Puedes continuar con el registro.';
+                    }
+                })
+                .catch(error => {
+                    bloquearRegistro(error.message);
+                });
+        }
+
+        function actualizarSeleccionActiva(nuevoIndice) {
+            const opciones = [...resultadosClientes.querySelectorAll('[data-cliente-opcion]')];
+            if (!opciones.length) return;
+            indiceActivo = (nuevoIndice + opciones.length) % opciones.length;
+            opciones.forEach((opcion, indice) => opcion.classList.toggle('active', indice === indiceActivo));
+            opciones[indiceActivo].scrollIntoView({ block: 'nearest' });
+        }
+
+        function seleccionarCliente(cliente) {
+            clienteId.value = cliente.id;
+            actualizarBotonGuardar();
+            clienteSeleccionado.textContent = `Cliente asociado: ${cliente.nombre} ${cliente.apellido} · C.I. ${cliente.cedula}`;
+            clienteSeleccionado.classList.remove('d-none');
+            resultadosClientes.replaceChildren();
+            indiceActivo = -1;
+        }
+
+        function buscarClientes() {
+            const termino = buscarCliente.value.trim();
+            resultadosClientes.replaceChildren();
+            indiceActivo = -1;
+            if (!termino) return;
+
+            fetch(`{{ url_for('ordenes.buscar_clientes') }}?q=${encodeURIComponent(termino)}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('No se pudo buscar el cliente.');
+                    return response.json();
+                })
+                .then(data => {
+                    if (buscarCliente.value.trim() !== termino) return;
+                    if (!data.clientes.length) {
+                        const vacio = document.createElement('div');
+                        vacio.className = 'list-group-item text-muted';
+                        vacio.textContent = 'No hay clientes que coincidan. Puedes registrarlo con el botón de abajo.';
+                        resultadosClientes.append(vacio);
+                        return;
+                    }
+                    data.clientes.forEach(cliente => {
+                        const opcion = document.createElement('button');
+                        opcion.type = 'button';
+                        opcion.className = 'list-group-item list-group-item-action';
+                        opcion.dataset.clienteOpcion = 'true';
+                        opcion.textContent = `CI ${cliente.cedula} — ${cliente.nombre} ${cliente.apellido}`;
+                        opcion.addEventListener('click', () => seleccionarCliente(cliente));
+                        resultadosClientes.append(opcion);
+                    });
+                    actualizarSeleccionActiva(0);
+                })
+                .catch(error => {
+                    const aviso = document.createElement('div');
+                    aviso.className = 'list-group-item text-danger';
+                    aviso.textContent = error.message;
+                    resultadosClientes.append(aviso);
+                });
+        }
+
+        chapaInput.addEventListener('input', () => {
+            resultadosChapa.replaceChildren();
+            bloquearRegistro('');
+            clearTimeout(temporizadorChapa);
+            temporizadorChapa = setTimeout(buscarChapa, 250);
+        });
+
+        buscarCliente.addEventListener('input', () => {
+            clienteId.value = '';
+            actualizarBotonGuardar();
+            clienteSeleccionado.classList.add('d-none');
+            resultadosClientes.replaceChildren();
+            clearTimeout(temporizadorCliente);
+            temporizadorCliente = setTimeout(buscarClientes, 200);
+        });
+
+        buscarCliente.addEventListener('keydown', event => {
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                event.preventDefault();
+                actualizarSeleccionActiva(indiceActivo + (event.key === 'ArrowDown' ? 1 : -1));
+            } else if (event.key === 'Enter' && resultadosClientes.querySelector('[data-cliente-opcion]')) {
+                event.preventDefault();
+                const opciones = [...resultadosClientes.querySelectorAll('[data-cliente-opcion]')];
+                opciones[indiceActivo < 0 ? 0 : indiceActivo].click();
+            }
+        });
+
+        document.getElementById('sin-cliente').addEventListener('click', () => {
+            clienteId.value = '';
+            actualizarBotonGuardar();
+            clienteSeleccionado.classList.add('d-none');
+            clienteSeleccionado.textContent = '';
+            resultadosClientes.replaceChildren();
+        });
+
+        linkRegistrarCliente.addEventListener('click', event => {
+            event.preventDefault();
+            const destino = new URL(linkRegistrarCliente.href);
+            destino.searchParams.set('cedula', buscarCliente.value.trim());
+            destino.searchParams.set('chapa', chapaInput.value.trim());
+            destino.searchParams.set('marca', document.getElementById('marca').value);
+            destino.searchParams.set('modelo', document.getElementById('modelo').value);
+            destino.searchParams.set('anio', document.getElementById('anio').value);
+            destino.searchParams.set('kilometraje', document.getElementById('kilometraje').value);
+            window.location.href = destino.toString();
+        });
+
+        document.getElementById('form-vehiculo').addEventListener('submit', event => {
+            if (!chapaVerificada || !chapaInput.value.trim()) {
+                event.preventDefault();
+                alert('Primero verifica que la chapa no esté registrada.');
+            } else if (vehiculoExistente && !clienteId.value) {
+                event.preventDefault();
+                alert('Selecciona el cliente que quieres asociar a este vehículo.');
+            }
+        });
+
+        document.getElementById('form-vehiculo').addEventListener('keydown', event => {
+            if (event.key === 'Enter') event.preventDefault();
+        });
+
+        if (chapaInput.value.trim()) {
+            buscarChapa();
+        }
+    </script>
 </body>
 </html>

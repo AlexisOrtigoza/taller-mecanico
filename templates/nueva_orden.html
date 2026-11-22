@@ -5,6 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Nueva Orden de Trabajo - Taller Mecánico</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .register-vehicle-option,
+        .register-vehicle-option.active {
+            background-color: #fff3cd !important;
+            border-color: #ffda6a !important;
+            color: #212529 !important;
+            font-weight: 600;
+        }
+
+        .register-vehicle-option:hover,
+        .register-vehicle-option.active {
+            background-color: #ffe69c !important;
+            color: #212529 !important;
+        }
+
+        .existing-vehicle-option,
+        .existing-vehicle-option.active {
+            background-color: #e7f1ff !important;
+            border-color: #9ec5fe !important;
+            color: #212529 !important;
+        }
+    </style>
 </head>
 <body class="bg-light">
 
@@ -40,7 +62,25 @@
                             <label for="busqueda-ingreso" class="form-label fw-bold" id="label-busqueda">Número de documento</label>
                             <input type="search" class="form-control form-control-lg" id="busqueda-ingreso"
                                    autocomplete="off" placeholder="Escribe la C.I. del cliente">
+                            <div id="cliente-seleccionado" class="alert alert-info mt-2 mb-0 d-none d-flex justify-content-between align-items-center gap-2" role="status">
+                                <span id="cliente-seleccionado-texto"></span>
+                                <button type="button" class="btn btn-outline-primary btn-sm flex-shrink-0 d-none" id="cambiar-cliente">Cambiar cliente</button>
+                            </div>
                             <div id="lista-resultados" class="list-group mt-2"></div>
+                            <div id="cliente-para-chapa" class="card mt-3 d-none">
+                                <div class="card-header bg-info-subtle fw-bold">Asociar un cliente a esta orden (opcional)</div>
+                                <div class="card-body">
+                                    <label for="buscar-cliente-chapa" class="form-label">Buscar por C.I. o nombre</label>
+                                    <input type="search" class="form-control" id="buscar-cliente-chapa"
+                                           autocomplete="off" placeholder="Escribe para buscar un cliente">
+                                    <div id="lista-clientes-chapa" class="list-group mt-2"></div>
+                                    <div class="d-flex flex-wrap gap-2 mt-3">
+                                        <a class="btn btn-outline-primary btn-sm" id="registrar-cliente-chapa"
+                                           href="{{ url_for('clientes.nuevo_cliente', volver_a_orden='1', retorno_chapa='1') }}">+ Registrar cliente nuevo</a>
+                                        <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="quitar-cliente-chapa">Quitar cliente</button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-md-4 d-flex align-items-end">
                             <button type="button" class="btn btn-outline-secondary w-100 mb-0" id="btn-sin-registro">
@@ -49,33 +89,46 @@
                         </div>
                     </div>
 
-                    <div id="vehiculo-seleccionado" class="alert alert-success mt-3 d-none"></div>
+                    <div id="vehiculo-seleccionado" class="alert alert-success mt-3 d-none d-flex justify-content-between align-items-center gap-2">
+                        <span id="vehiculo-seleccionado-texto"></span>
+                        <button type="button" class="btn btn-outline-success btn-sm flex-shrink-0" id="cambiar-vehiculo">Cambiar vehículo</button>
+                    </div>
+                    <div id="kilometraje-ingreso-wrap" class="mt-3 d-none">
+                        <label for="kilometraje_ingreso" class="form-label fw-bold">Kilometraje al ingreso *</label>
+                        <input type="number" class="form-control" id="kilometraje_ingreso" name="kilometraje_ingreso" min="0">
+                        <div id="kilometraje-anterior" class="form-text"></div>
+                    </div>
 
                     <div id="datos-sin-registro" class="card border-warning mt-3 d-none">
-                        <div class="card-header bg-warning-subtle fw-bold" id="titulo-datos-vehiculo">Datos del vehículo no registrado</div>
+                        <div class="card-header bg-warning-subtle fw-bold" id="titulo-datos-vehiculo">Registrar o asociar vehículo</div>
                         <div class="card-body">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="marca" class="form-label">Marca *</label>
-                                    <input type="text" class="form-control" id="marca" name="marca" placeholder="Ej: Toyota">
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="modelo" class="form-label">Modelo *</label>
-                                    <input type="text" class="form-control" id="modelo" name="modelo" placeholder="Ej: Hilux">
-                                </div>
+                            <div class="mb-3">
+                                <label for="chapa" class="form-label fw-bold">Primero, número de chapa *</label>
+                                <input type="search" class="form-control" id="chapa" name="chapa" autocomplete="off" placeholder="Ej: ABC 123">
+                                <div class="form-text">Si ya existe, podrás asociar ese vehículo al cliente seleccionado.</div>
+                                <div id="resultados-chapa-orden" class="list-group mt-2"></div>
+                                <div id="estado-chapa-orden" class="mt-2" role="status"></div>
                             </div>
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label for="chapa" class="form-label">Chapa *</label>
-                                    <input type="text" class="form-control" id="chapa" name="chapa" placeholder="Ej: ABC 123">
+                            <div id="detalle-vehiculo-nuevo" class="d-none">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="marca" class="form-label">Marca *</label>
+                                        <input type="text" class="form-control" id="marca" name="marca" placeholder="Ej: Toyota">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="modelo" class="form-label">Modelo *</label>
+                                        <input type="text" class="form-control" id="modelo" name="modelo" placeholder="Ej: Hilux">
+                                    </div>
                                 </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="anio" class="form-label">Año</label>
-                                    <input type="number" class="form-control" id="anio" name="anio" min="1900" max="2100">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="kilometraje" class="form-label">Kilometraje</label>
-                                    <input type="number" class="form-control" id="kilometraje" name="kilometraje" min="0">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="anio" class="form-label">Año</label>
+                                        <input type="number" class="form-control" id="anio" name="anio" min="1900" max="2100">
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="kilometraje" class="form-label">Kilometraje al ingreso *</label>
+                                        <input type="number" class="form-control" id="kilometraje" name="kilometraje" min="0">
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -157,41 +210,102 @@
     <script>
         let modoBusqueda = 'ci';
         let temporizadorBusqueda;
+        const clienteInicial = {{ cliente_inicial|tojson }};
+        const vehiculoInicial = {{ vehiculo_inicial|tojson }};
+        const modoBusquedaInicial = {{ modo_busqueda_inicial|tojson }};
+        const chapaInicial = {{ chapa_inicial|tojson }};
 
         const inputBusqueda = document.getElementById('busqueda-ingreso');
         const listaResultados = document.getElementById('lista-resultados');
+        const clienteParaChapa = document.getElementById('cliente-para-chapa');
+        const inputClienteChapa = document.getElementById('buscar-cliente-chapa');
+        const listaClientesChapa = document.getElementById('lista-clientes-chapa');
+        const botonQuitarClienteChapa = document.getElementById('quitar-cliente-chapa');
+        const linkRegistrarClienteChapa = document.getElementById('registrar-cliente-chapa');
+        const clienteSeleccionadoVista = document.getElementById('cliente-seleccionado');
+        const clienteSeleccionadoTexto = document.getElementById('cliente-seleccionado-texto');
+        const botonCambiarCliente = document.getElementById('cambiar-cliente');
         const vehiculoSeleccionado = document.getElementById('vehiculo-seleccionado');
+        const vehiculoSeleccionadoTexto = document.getElementById('vehiculo-seleccionado-texto');
+        const botonCambiarVehiculo = document.getElementById('cambiar-vehiculo');
+        const kilometrajeIngresoWrap = document.getElementById('kilometraje-ingreso-wrap');
+        const kilometrajeIngreso = document.getElementById('kilometraje_ingreso');
+        const kilometrajeAnterior = document.getElementById('kilometraje-anterior');
         const datosSinRegistro = document.getElementById('datos-sin-registro');
         const vehiculoId = document.getElementById('vehiculo_id');
         const clienteId = document.getElementById('cliente_id');
+        const chapaOrden = document.getElementById('chapa');
+        const resultadosChapaOrden = document.getElementById('resultados-chapa-orden');
+        const estadoChapaOrden = document.getElementById('estado-chapa-orden');
+        const detalleVehiculoNuevo = document.getElementById('detalle-vehiculo-nuevo');
         let indiceActivo = -1;
         let clienteSeleccionado = null;
+        let temporizadorChapaOrden;
+        let temporizadorClienteChapa;
+        let indiceVehiculoActivo = -1;
+
+        function limpiarVehiculoSeleccionado() {
+            vehiculoId.value = '';
+            vehiculoSeleccionado.classList.add('d-none');
+            vehiculoSeleccionadoTexto.textContent = '';
+            datosSinRegistro.classList.add('d-none');
+            detalleVehiculoNuevo.classList.add('d-none');
+            kilometrajeIngresoWrap.classList.add('d-none');
+            kilometrajeIngreso.required = false;
+            kilometrajeIngreso.value = '';
+            kilometrajeIngreso.min = '0';
+            kilometrajeAnterior.textContent = '';
+            document.getElementById('kilometraje').required = false;
+        }
 
         function limpiarSeleccion() {
-            vehiculoId.value = '';
+            limpiarVehiculoSeleccionado();
             clienteId.value = '';
             clienteSeleccionado = null;
             indiceActivo = -1;
-            vehiculoSeleccionado.classList.add('d-none');
-            vehiculoSeleccionado.textContent = '';
+            clienteSeleccionadoVista.classList.add('d-none');
+            clienteSeleccionadoTexto.textContent = '';
+            botonCambiarCliente.classList.add('d-none');
+            inputClienteChapa.value = '';
+            listaClientesChapa.replaceChildren();
+            botonQuitarClienteChapa.classList.add('d-none');
         }
 
-        function seleccionarVehiculo(id, descripcion) {
+        function seleccionarVehiculo(id, descripcion, kilometraje = null) {
             vehiculoId.value = id;
             datosSinRegistro.classList.add('d-none');
-            vehiculoSeleccionado.textContent = `Vehículo seleccionado: ${descripcion}`;
+            detalleVehiculoNuevo.classList.add('d-none');
+            document.getElementById('kilometraje').required = false;
+            vehiculoSeleccionadoTexto.textContent = `Vehículo seleccionado${clienteSeleccionado ? ` para ${clienteSeleccionado.nombre} ${clienteSeleccionado.apellido}` : ''}: ${descripcion}`;
             vehiculoSeleccionado.classList.remove('d-none');
             listaResultados.innerHTML = '';
+            kilometrajeIngreso.value = kilometraje === null || kilometraje === undefined ? '' : kilometraje;
+            kilometrajeIngreso.required = true;
+            kilometrajeIngreso.min = kilometraje === null || kilometraje === undefined ? '0' : String(kilometraje);
+            kilometrajeIngresoWrap.classList.remove('d-none');
+            kilometrajeAnterior.textContent = kilometraje === null || kilometraje === undefined
+                ? 'No hay un kilometraje anterior registrado.'
+                : `Último kilometraje registrado: ${Number(kilometraje).toLocaleString('es-PY')} km. Ingresa una lectura igual o superior a la actual.`;
         }
 
-        function mostrarSinRegistro(prefillChapa = '') {
-            limpiarSeleccion();
-            datosSinRegistro.classList.remove('d-none');
-            document.getElementById('titulo-datos-vehiculo').textContent = 'Datos del vehículo no registrado';
-            if (prefillChapa) {
-                document.getElementById('chapa').value = prefillChapa;
+        function mostrarSinRegistro(prefillChapa = '', conservarCliente = false) {
+            if (conservarCliente) {
+                limpiarVehiculoSeleccionado();
+            } else {
+                limpiarSeleccion();
             }
-            document.getElementById('marca').focus();
+            datosSinRegistro.classList.remove('d-none');
+            listaResultados.replaceChildren();
+            document.getElementById('titulo-datos-vehiculo').textContent = 'Registrar o asociar vehículo';
+            detalleVehiculoNuevo.classList.add('d-none');
+            resultadosChapaOrden.replaceChildren();
+            estadoChapaOrden.textContent = '';
+            if (prefillChapa) {
+                chapaOrden.value = prefillChapa;
+                buscarChapaParaOrden();
+                return;
+            }
+            chapaOrden.focus();
         }
 
         function actualizarIndiceActivo(indice) {
@@ -267,9 +381,57 @@
                 });
         }
 
+        function seleccionarClienteParaChapa(cliente) {
+            clienteSeleccionado = cliente;
+            clienteId.value = cliente.id;
+            clienteSeleccionadoTexto.textContent =
+                `Cliente seleccionado: ${cliente.nombre} ${cliente.apellido} · C.I. ${cliente.cedula}`;
+            clienteSeleccionadoVista.classList.remove('d-none');
+            botonCambiarCliente.classList.remove('d-none');
+            botonQuitarClienteChapa.classList.remove('d-none');
+            listaClientesChapa.replaceChildren();
+        }
+
+        function buscarClientesParaChapa() {
+            const termino = inputClienteChapa.value.trim();
+            listaClientesChapa.replaceChildren();
+            if (!termino) return;
+
+            fetch(`{{ url_for('ordenes.buscar_clientes') }}?q=${encodeURIComponent(termino)}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (inputClienteChapa.value.trim() !== termino) return;
+                    if (!data.clientes || data.clientes.length === 0) {
+                        const vacio = document.createElement('div');
+                        vacio.className = 'list-group-item text-muted';
+                        vacio.textContent = 'No se encontró un cliente con esos datos. Puedes registrarlo aquí abajo.';
+                        listaClientesChapa.append(vacio);
+                        return;
+                    }
+                    data.clientes.forEach(cliente => {
+                        const opcion = document.createElement('button');
+                        opcion.type = 'button';
+                        opcion.className = 'list-group-item list-group-item-action';
+                        opcion.textContent = `CI ${cliente.cedula} — ${cliente.nombre} ${cliente.apellido}`;
+                        opcion.addEventListener('click', () => seleccionarClienteParaChapa(cliente));
+                        listaClientesChapa.append(opcion);
+                    });
+                })
+                .catch(() => {
+                    const error = document.createElement('div');
+                    error.className = 'list-group-item text-danger';
+                    error.textContent = 'No se pudo buscar el cliente.';
+                    listaClientesChapa.append(error);
+                });
+        }
+
         function cargarVehiculosCliente(cliente) {
             clienteSeleccionado = cliente;
             clienteId.value = cliente.id;
+            datosSinRegistro.classList.add('d-none');
+            clienteSeleccionadoTexto.textContent = `Cliente seleccionado: ${cliente.nombre} ${cliente.apellido} · C.I. ${cliente.cedula}`;
+            clienteSeleccionadoVista.classList.remove('d-none');
+            botonCambiarCliente.classList.remove('d-none');
             indiceActivo = -1;
             fetch(`{{ url_for('ordenes.vehiculos_cliente', cliente_id=0) }}`.replace('/0', `/${cliente.id}`))
                 .then(response => response.json())
@@ -286,39 +448,128 @@
                         boton.type = 'button';
                         boton.className = 'list-group-item list-group-item-action';
                         boton.dataset.opcionLista = 'vehiculo';
-                        boton.dataset.opcionLista = 'vehiculo';
                         boton.textContent = `${vehiculo.marca} ${vehiculo.modelo} - Chapa: ${vehiculo.chapa}${vehiculo.anio ? ` (${vehiculo.anio})` : ''}`;
                         boton.addEventListener('click', () => seleccionarVehiculo(
                             vehiculo.id,
-                            `${vehiculo.marca} ${vehiculo.modelo} - ${vehiculo.chapa}`
+                            `${vehiculo.marca} ${vehiculo.modelo} - ${vehiculo.chapa}`,
+                            vehiculo.kilometraje
                         ));
                         listaResultados.append(boton);
                     });
 
                     const registrar = document.createElement('button');
                     registrar.type = 'button';
-                    registrar.className = 'list-group-item list-group-item-action text-primary fw-bold';
+                    registrar.className = 'list-group-item list-group-item-action register-vehicle-option';
                     registrar.dataset.opcionLista = 'registrar';
                     registrar.textContent = '+ Registrar vehículo para este cliente';
                     registrar.addEventListener('click', () => {
-                        limpiarSeleccion();
+                        vehiculoId.value = '';
                         clienteId.value = cliente.id;
+                        vehiculoSeleccionado.classList.add('d-none');
                         datosSinRegistro.classList.remove('d-none');
                         document.getElementById('titulo-datos-vehiculo').textContent =
-                            `Registrar vehículo para ${cliente.nombre} ${cliente.apellido} (CI ${cliente.cedula})`;
-                        vehiculoSeleccionado.classList.add('d-none');
+                            `Registrar o asociar vehículo para ${cliente.nombre} ${cliente.apellido} (CI ${cliente.cedula})`;
+                        detalleVehiculoNuevo.classList.add('d-none');
+                        chapaOrden.value = '';
+                        resultadosChapaOrden.replaceChildren();
+                        estadoChapaOrden.textContent = '';
                         listaResultados.innerHTML = '';
-                        document.getElementById('marca').focus();
+                        chapaOrden.focus();
                     });
                     listaResultados.append(registrar);
                     actualizarIndiceActivo(0);
                 });
         }
 
+        function buscarChapaParaOrden() {
+            const chapa = chapaOrden.value.trim();
+            resultadosChapaOrden.replaceChildren();
+            estadoChapaOrden.textContent = '';
+            detalleVehiculoNuevo.classList.add('d-none');
+            vehiculoId.value = '';
+            vehiculoSeleccionado.classList.add('d-none');
+            kilometrajeIngresoWrap.classList.add('d-none');
+            kilometrajeIngreso.required = false;
+            kilometrajeIngreso.value = '';
+            kilometrajeIngreso.min = '0';
+            document.getElementById('kilometraje').required = false;
+            indiceVehiculoActivo = -1;
+            if (chapa.length < 2) return;
+
+            estadoChapaOrden.textContent = 'Buscando chapa...';
+            fetch(`{{ url_for('vehiculos.buscar_vehiculo_por_chapa') }}?q=${encodeURIComponent(chapa)}`)
+                .then(response => {
+                    if (!response.ok) throw new Error('No se pudo consultar la chapa.');
+                    return response.json();
+                })
+                .then(data => {
+                    if (chapaOrden.value.trim() !== chapa) return;
+                    estadoChapaOrden.textContent = '';
+                    data.vehiculos.forEach(vehiculo => {
+                        const boton = document.createElement('button');
+                        boton.type = 'button';
+                        boton.className = 'list-group-item list-group-item-action existing-vehicle-option';
+                        boton.dataset.vehiculoExistente = 'true';
+                        const clientes = vehiculo.clientes || 'Sin cliente asociado';
+                        boton.textContent = `${vehiculo.chapa} — ${vehiculo.marca} ${vehiculo.modelo} · Clientes: ${clientes} · Asociar y usar este vehículo`;
+                        boton.addEventListener('click', () => seleccionarVehiculo(
+                            vehiculo.id,
+                            `${vehiculo.marca} ${vehiculo.modelo} - ${vehiculo.chapa}`,
+                            vehiculo.kilometraje
+                        ));
+                        resultadosChapaOrden.append(boton);
+                    });
+
+                    if (data.coincidencia_exacta) {
+                        estadoChapaOrden.textContent = 'El vehículo ya existe. Selecciónalo arriba para asociarlo también a este cliente.';
+                        if (resultadosChapaOrden.firstElementChild) {
+                            resultadosChapaOrden.firstElementChild.focus();
+                        }
+                    } else {
+                        detalleVehiculoNuevo.classList.remove('d-none');
+                        document.getElementById('kilometraje').required = true;
+                        estadoChapaOrden.textContent = data.vehiculos.length
+                            ? 'No hay coincidencia exacta. Verifica las chapas parecidas y completa los datos para registrar uno nuevo.'
+                            : 'No encontramos esta chapa. Completa los datos para registrar el vehículo.';
+                    }
+                })
+                .catch(error => {
+                    estadoChapaOrden.textContent = error.message;
+                });
+        }
+
+        chapaOrden.addEventListener('input', () => {
+            resultadosChapaOrden.replaceChildren();
+            estadoChapaOrden.textContent = '';
+            detalleVehiculoNuevo.classList.add('d-none');
+            vehiculoId.value = '';
+            vehiculoSeleccionado.classList.add('d-none');
+            kilometrajeIngresoWrap.classList.add('d-none');
+            kilometrajeIngreso.required = false;
+            kilometrajeIngreso.value = '';
+            kilometrajeIngreso.min = '0';
+            document.getElementById('kilometraje').required = false;
+            clearTimeout(temporizadorChapaOrden);
+            temporizadorChapaOrden = setTimeout(buscarChapaParaOrden, 250);
+        });
+
+        chapaOrden.addEventListener('keydown', event => {
+            const opciones = [...resultadosChapaOrden.querySelectorAll('[data-vehiculo-existente]')];
+            if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                if (!opciones.length) return;
+                event.preventDefault();
+                indiceVehiculoActivo = (indiceVehiculoActivo + (event.key === 'ArrowDown' ? 1 : -1) + opciones.length) % opciones.length;
+                opciones.forEach((opcion, indice) => opcion.classList.toggle('active', indice === indiceVehiculoActivo));
+            } else if (event.key === 'Enter') {
+                event.preventDefault();
+                if (opciones.length) opciones[indiceVehiculoActivo < 0 ? 0 : indiceVehiculoActivo].click();
+            }
+        });
+
         function buscarVehiculoPorChapa() {
             const termino = inputBusqueda.value.trim();
             listaResultados.innerHTML = '';
-            limpiarSeleccion();
+            limpiarVehiculoSeleccionado();
             if (termino.length < 2) return;
 
             fetch(`{{ url_for('ordenes.buscar_vehiculos') }}?q=${encodeURIComponent(termino)}`)
@@ -336,13 +587,13 @@
                         registrar.className = 'btn btn-primary btn-sm';
                         registrar.dataset.opcionLista = 'registrar';
                         registrar.textContent = 'Sí, registrar vehículo';
-                        registrar.href = `{{ url_for('vehiculos.nuevo_vehiculo') }}?chapa=${encodeURIComponent(termino)}&volver_a_orden=1`;
+                        registrar.href = `{{ url_for('vehiculos.nuevo_vehiculo') }}?chapa=${encodeURIComponent(termino)}&volver_a_orden=1${clienteId.value ? `&cliente_id=${encodeURIComponent(clienteId.value)}` : ''}`;
                         const continuar = document.createElement('button');
                         continuar.type = 'button';
                         continuar.className = 'btn btn-outline-secondary btn-sm';
                         continuar.dataset.opcionLista = 'sin-registro';
                         continuar.textContent = 'No, cargar sin registrar';
-                        continuar.addEventListener('click', () => mostrarSinRegistro(termino));
+                        continuar.addEventListener('click', () => mostrarSinRegistro(termino, modoBusqueda === 'chapa'));
                         acciones.append(registrar, continuar);
                         caja.append(texto, acciones);
                         listaResultados.append(caja);
@@ -354,14 +605,15 @@
                         const boton = document.createElement('button');
                         boton.type = 'button';
                         boton.className = 'list-group-item list-group-item-action';
-                        const propietario = vehiculo.cliente_nombre
-                            ? ` · ${vehiculo.cliente_nombre} ${vehiculo.cliente_apellido}`
+                        const propietario = vehiculo.clientes
+                            ? ` · Cliente(s): ${vehiculo.clientes}`
                             : ' · Sin cliente registrado';
                         boton.dataset.opcionLista = 'vehiculo';
                         boton.textContent = `${vehiculo.marca} ${vehiculo.modelo} - Chapa: ${vehiculo.chapa}${propietario}`;
                         boton.addEventListener('click', () => seleccionarVehiculo(
                             vehiculo.id,
-                            `${vehiculo.marca} ${vehiculo.modelo} - ${vehiculo.chapa}`
+                            `${vehiculo.marca} ${vehiculo.modelo} - ${vehiculo.chapa}`,
+                            vehiculo.kilometraje
                         ));
                         listaResultados.append(boton);
                     });
@@ -377,17 +629,52 @@
                 inputBusqueda.value = '';
                 listaResultados.innerHTML = '';
                 limpiarSeleccion();
+                clienteParaChapa.classList.toggle('d-none', modoBusqueda !== 'chapa');
                 document.getElementById('label-busqueda').textContent =
                     modoBusqueda === 'ci' ? 'Número de documento' : 'Número de chapa';
                 inputBusqueda.placeholder =
                     modoBusqueda === 'ci' ? 'Escribe la C.I. del cliente' : 'Escribe la chapa del vehículo';
+                if (modoBusqueda !== 'chapa') {
+                    inputClienteChapa.value = '';
+                    listaClientesChapa.replaceChildren();
+                }
                 inputBusqueda.focus();
             });
+        });
+
+        inputClienteChapa.addEventListener('input', () => {
+            clearTimeout(temporizadorClienteChapa);
+            temporizadorClienteChapa = setTimeout(buscarClientesParaChapa, 200);
+        });
+
+        botonQuitarClienteChapa.addEventListener('click', () => {
+            clienteId.value = '';
+            clienteSeleccionado = null;
+            clienteSeleccionadoVista.classList.add('d-none');
+            clienteSeleccionadoTexto.textContent = '';
+            botonCambiarCliente.classList.add('d-none');
+            botonQuitarClienteChapa.classList.add('d-none');
+            inputClienteChapa.value = '';
+            listaClientesChapa.replaceChildren();
+        });
+
+        linkRegistrarClienteChapa.addEventListener('click', event => {
+            event.preventDefault();
+            const destino = new URL(linkRegistrarClienteChapa.href);
+            const chapa = chapaOrden.value.trim() || inputBusqueda.value.trim();
+            const clienteTermino = inputClienteChapa.value.trim();
+            if (chapa) destino.searchParams.set('chapa', chapa);
+            if (clienteTermino) destino.searchParams.set('cedula', clienteTermino);
+            if (vehiculoId.value) destino.searchParams.set('vehiculo_id', vehiculoId.value);
+            window.location.href = destino.toString();
         });
 
         inputBusqueda.addEventListener('input', () => {
             clearTimeout(temporizadorBusqueda);
             indiceActivo = -1;
+            if (modoBusqueda === 'chapa') {
+                clienteParaChapa.classList.remove('d-none');
+            }
             temporizadorBusqueda = setTimeout(
                 modoBusqueda === 'ci' ? buscarCliente : buscarVehiculoPorChapa,
                 250
@@ -409,22 +696,84 @@
 
         document.getElementById('btn-sin-registro').addEventListener('click', () => {
             const termino = inputBusqueda.value.trim();
-            mostrarSinRegistro(modoBusqueda === 'chapa' ? termino : '');
+            mostrarSinRegistro(modoBusqueda === 'chapa' ? termino : '', modoBusqueda === 'chapa');
+        });
+
+        botonCambiarVehiculo.addEventListener('click', () => {
+            const cliente = clienteSeleccionado;
+            vehiculoId.value = '';
+            vehiculoSeleccionado.classList.add('d-none');
+            kilometrajeIngresoWrap.classList.add('d-none');
+            kilometrajeIngreso.required = false;
+            kilometrajeIngreso.value = '';
+            kilometrajeIngreso.min = '0';
+            if (cliente) {
+                cargarVehiculosCliente(cliente);
+            } else {
+                buscarVehiculoPorChapa();
+            }
+        });
+
+        botonCambiarCliente.addEventListener('click', () => {
+            if (modoBusqueda === 'chapa') {
+                botonQuitarClienteChapa.click();
+                inputClienteChapa.focus();
+            } else {
+                limpiarSeleccion();
+                datosSinRegistro.classList.add('d-none');
+                listaResultados.innerHTML = '';
+                inputBusqueda.value = '';
+                inputBusqueda.focus();
+            }
         });
 
         document.querySelector('form[action="{{ url_for("ordenes.nueva_orden") }}"]').addEventListener('submit', event => {
             if (!vehiculoId.value && datosSinRegistro.classList.contains('d-none')) {
                 event.preventDefault();
                 alert('Selecciona un cliente y vehículo, o elige continuar sin registro.');
+                return;
             }
-            if (datosSinRegistro.classList.contains('d-none') === false) {
-                const requeridos = ['marca', 'modelo', 'chapa'];
+            if (!vehiculoId.value && detalleVehiculoNuevo.classList.contains('d-none')) {
+                event.preventDefault();
+                alert('Verifica la chapa y selecciona el vehículo existente o registra uno nuevo.');
+                return;
+            }
+            if (!vehiculoId.value) {
+                const requeridos = ['marca', 'modelo', 'chapa', 'kilometraje'];
                 if (requeridos.some(id => document.getElementById(id).value.trim() === '')) {
                     event.preventDefault();
-                    alert('Marca, modelo y chapa son obligatorios.');
+                    alert('Verifica la chapa e indica marca, modelo y kilometraje del vehículo.');
+                    return;
                 }
             }
+            if (vehiculoId.value && kilometrajeIngreso.value === '') {
+                event.preventDefault();
+                alert('Ingresa el kilometraje actual del vehículo.');
+            }
         });
+
+        const formularioOrden = document.querySelector('form[action="{{ url_for("ordenes.nueva_orden") }}"]');
+        formularioOrden.addEventListener('keydown', event => {
+            if (event.key === 'Enter') event.preventDefault();
+        });
+
+        if (modoBusquedaInicial === 'chapa') {
+            document.querySelector('[data-modo="chapa"]').click();
+            inputBusqueda.value = chapaInicial;
+            clienteParaChapa.classList.remove('d-none');
+            if (clienteInicial) {
+                seleccionarClienteParaChapa(clienteInicial);
+            }
+            if (vehiculoInicial) {
+                seleccionarVehiculo(
+                    vehiculoInicial.id,
+                    `${vehiculoInicial.marca} ${vehiculoInicial.modelo} - ${vehiculoInicial.chapa}`,
+                    vehiculoInicial.kilometraje
+                );
+            } else if (chapaInicial) {
+                buscarVehiculoPorChapa();
+            }
+        }
 
         // Función para recalcular subtotales y total general
         function calcularTotales() {

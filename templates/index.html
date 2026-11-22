@@ -24,8 +24,8 @@
 
     <div class="mb-3 d-flex justify-content-between align-items-center">
         <div>
-            <a href="{{ url_for('clientes.nuevo_cliente') }}" class="btn btn-success btn-sm">+ Registrar Cliente</a>
-            <a href="{{ url_for('vehiculos.nuevo_vehiculo') }}" class="btn btn-primary btn-sm">+ Registrar Vehículo</a>
+            <a href="{{ url_for('clientes.lista_clientes') }}" class="btn btn-success btn-sm">Clientes</a>
+            <a href="{{ url_for('vehiculos.lista_vehiculos') }}" class="btn btn-primary btn-sm">Vehículos</a>
             <a href="{{ url_for('ordenes.nueva_orden') }}" class="btn btn-warning btn-sm text-dark fw-bold">+ Nueva Orden</a>
             <a href="{{ url_for('repuestos.gestionar_repuestos') }}" class="btn btn-info btn-sm text-dark fw-bold">📦 Gestionar Repuestos</a>
         </div>
@@ -192,6 +192,7 @@
                         <div class="col-md-6">
                             <h6><strong>Vehículo:</strong> <span id="det-vehiculo"></span></h6>
                             <p>Chapa: <span id="det-chapa"></span> | Año: <span id="det-anio"></span></p>
+                            <p>Kilometraje al ingreso: <span id="det-kilometraje"></span> km</p>
                         </div>
                     </div>
                     <hr>
@@ -247,6 +248,7 @@
                     document.getElementById('det-vehiculo').innerText = `${o.marca} ${o.modelo}`;
                     document.getElementById('det-chapa').innerText = o.chapa;
                     document.getElementById('det-anio').innerText = o.anio || 'N/A';
+                    document.getElementById('det-kilometraje').innerText = o.kilometraje_ingreso == null ? 'N/A' : new Intl.NumberFormat('es-PY').format(o.kilometraje_ingreso);
                     document.getElementById('det-sintoma').innerText = o.sintoma;
                     document.getElementById('det-total').innerText = new Intl.NumberFormat('es-PY').format(o.costo_total) + ' Gs.';
 
