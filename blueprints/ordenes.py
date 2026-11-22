@@ -30,6 +30,7 @@ def nueva_orden():
                 chapa = request.form.get('chapa', '').strip()
                 anio = request.form.get('anio') or None
                 kilometraje = request.form.get('kilometraje') or None
+                cliente_id_registro = request.form.get('cliente_id') or None
                 if not marca or not modelo or not chapa:
                     conn.close()
                     abort(400, 'Debe indicar marca, modelo y chapa del vehiculo')
@@ -41,8 +42,8 @@ def nueva_orden():
                 else:
                     cursor.execute(
                         "INSERT INTO vehiculos (cliente_id, marca, modelo, anio, chapa, kilometraje) "
-                        "VALUES (NULL, %s, %s, %s, %s, %s) RETURNING id",
-                        (marca, modelo, anio, chapa, kilometraje)
+                        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                        (cliente_id_registro, marca, modelo, anio, chapa, kilometraje)
                     )
                     vehiculo_id = cursor.fetchone()[0]
 
