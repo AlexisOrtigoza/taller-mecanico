@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, abort, flash
 from db import obtener_conexion
 
 clientes_bp = Blueprint('clientes', __name__)
@@ -17,6 +17,8 @@ def nuevo_cliente():
         
         if not cedula or not nombre or not apellido or not celular:
             return render_template('nuevo_cliente.html', error="Por favor completa todos los campos obligatorios (*).")
+        if any(len(campo.strip()) == 0 for campo in (cedula, nombre, apellido, celular)):
+            abort(400, 'Los datos obligatorios no pueden estar vacios')
             
         try:
             conn = obtener_conexion()
@@ -29,6 +31,7 @@ def nuevo_cliente():
             conn.commit()
             cursor.close()
             conn.close()
+            flash('Cliente registrado correctamente.', 'success')
             return redirect(url_for('main.dashboard'))
         except Exception as e:
             return render_template('nuevo_cliente.html', error=f"Error al registrar: {e}")

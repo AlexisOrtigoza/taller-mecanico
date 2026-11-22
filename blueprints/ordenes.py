@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, abort, flash
 from db import obtener_conexion
 from psycopg2.extras import RealDictCursor
 
@@ -12,6 +12,13 @@ def nueva_orden():
         lista_repuestos = request.form.getlist('repuesto_id[]')
         lista_cantidades = request.form.getlist('cantidad[]')
         lista_precios = request.form.getlist('precio_unitario[]')
+
+        if not vehiculo_id or not sintoma or not sintoma.strip():
+            abort(400, 'Debe indicar el vehiculo y el sintoma')
+        if len(lista_repuestos) != len(lista_cantidades) or len(lista_repuestos) != len(lista_precios):
+            abort(400, 'Los datos de repuestos no son validos')
+        if not lista_repuestos:
+            abort(400, 'Debe agregar al menos un repuesto o servicio')
         
         try:
             conn = obtener_conexion()
@@ -23,16 +30,35 @@ def nueva_orden():
             costo_acumulado = 0
             for i in range(len(lista_repuestos)):
                 repuesto_id = lista_repuestos[i]
-                cantidad = int(lista_cantidades[i])
-                precio_unitario = float(lista_precios[i])
+                try:
+                    cantidad = int(lista_cantidades[i])
+                    precio_unitario = float(lista_precios[i])
+                except (TypeError, ValueError):
+                    abort(400, 'Cantidad o precio invalidos')
+                if cantidad <= 0 or precio_unitario < 0:
+                    abort(400, 'Cantidad o precio invalidos')
+
+                cursor.execute("SELECT nombre, stock_actual FROM repuestos WHERE id = %s FOR UPDATE", (repuesto_id,))
+                repuesto = cursor.fetchone()
+                if not repuesto:
+                    conn.rollback()
+                    abort(400, 'El repuesto seleccionado ya no existe')
+                es_servicio = 'servicio' in repuesto[0].lower() or 'mano de obra' in repuesto[0].lower()
+                if not es_servicio and repuesto[1] < cantidad:
+                    conn.rollback()
+                    abort(400, f"Stock insuficiente para {repuesto[0]}: disponible {repuesto[1]}")
+
                 subtotal = cantidad * precio_unitario
                 costo_acumulado += subtotal
                 cursor.execute("INSERT INTO detalle_orden (orden_id, repuesto_id, cantidad, precio_unitario) VALUES (%s, %s, %s, %s)", (orden_id, repuesto_id, cantidad, precio_unitario))
+                if not es_servicio:
+                    cursor.execute("UPDATE repuestos SET stock_actual = stock_actual - %s WHERE id = %s", (cantidad, repuesto_id))
             
             cursor.execute("UPDATE ordenes_trabajo SET costo_total = %s WHERE id = %s", (costo_acumulado, orden_id))
             conn.commit()
             cursor.close()
             conn.close()
+            flash(f'Orden #{orden_id} creada correctamente.', 'success')
             return redirect(url_for('main.dashboard'))
         except Exception as e:
             conn = obtener_conexion()
@@ -58,8 +84,12 @@ def nueva_orden():
         vehiculos, repuestos = [], []
     return render_template('nueva_orden.html', vehiculos=vehiculos, repuestos=repuestos)
 
-@ordenes_bp.route('/estado/<int:orden_id>/<string:nuevo_estado>')
-def cambiar_estado_orden(orden_id, nuevo_estado):
+@ordenes_bp.route('/estado/<int:orden_id>', methods=['POST'])
+def cambiar_estado_orden(orden_id):
+    nuevo_estado = request.form.get('nuevo_estado')
+    estados_validos = {'Pendiente', 'En Proceso', 'Finalizado'}
+    if nuevo_estado not in estados_validos:
+        abort(400, 'Estado invalido')
     try:
         conn = obtener_conexion()
         cursor = conn.cursor()
@@ -122,3 +152,24 @@ def obtener_detalle_orden(id):
         return {"orden": orden, "repuestos": repuestos}
     except Exception as e:
         return {"error": str(e)}, 500
+
+
+@ordenes_bp.route('/seguimiento/<int:id>')
+def seguimiento_orden(id):
+    try:
+        conn = obtener_conexion()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute("""
+            SELECT o.*, v.marca, v.modelo, v.chapa
+            FROM ordenes_trabajo o
+            JOIN vehiculos v ON o.vehiculo_id = v.id
+            WHERE o.id = %s AND o.oculto = FALSE
+        """, (id,))
+        orden = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if not orden:
+            return render_template('seguimiento.html', orden=None), 404
+        return render_template('seguimiento.html', orden=orden)
+    except Exception as e:
+        return render_template('seguimiento.html', orden=None, error=str(e)), 500

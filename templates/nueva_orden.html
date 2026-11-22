@@ -21,6 +21,7 @@
                 {% endif %}
 
                 <form action="{{ url_for('ordenes.nueva_orden') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     
                     <!-- Selección del Vehículo -->
                     <div class="mb-3">
@@ -72,7 +73,7 @@
                                         </select>
                                     </td>
                                     <td>
-                                        <input type="number" name="cantidad[]" class="form-control input-cantidad" min="1" value="1" required>
+                                        <input type="number" name="cantidad[]" class="form-control input-cantidad" min="1" step="1" value="1" required>
                                     </td>
                                     <td>
                                         <input type="number" step="0.01" name="precio_unitario[]" class="form-control input-precio" value="0" readonly required>

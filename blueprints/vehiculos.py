@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, request, redirect, url_for
+from flask import Blueprint, render_template, request, redirect, url_for, abort, flash
 from db import obtener_conexion
 
 vehiculos_bp = Blueprint('vehiculos', __name__)
@@ -12,6 +12,24 @@ def nuevo_vehiculo():
         anio = request.form.get('anio') or None
         chapa = request.form.get('chapa')
         kilometraje = request.form.get('kilometraje') or None
+
+        if not cliente_id or not marca or not modelo or not chapa:
+            abort(400, 'Faltan datos obligatorios del vehiculo')
+        if any(len(campo.strip()) == 0 for campo in (marca, modelo, chapa)):
+            abort(400, 'Los datos del vehiculo no pueden estar vacios')
+        if anio is not None:
+            try:
+                anio_numero = int(anio)
+                if anio_numero < 1900 or anio_numero > 2100:
+                    abort(400, 'El ano del vehiculo no es valido')
+            except (TypeError, ValueError):
+                abort(400, 'El ano del vehiculo no es valido')
+        if kilometraje is not None:
+            try:
+                if int(kilometraje) < 0:
+                    abort(400, 'El kilometraje no puede ser negativo')
+            except (TypeError, ValueError):
+                abort(400, 'El kilometraje no es valido')
         
         try:
             conn = obtener_conexion()
@@ -24,6 +42,7 @@ def nuevo_vehiculo():
             conn.commit()
             cursor.close()
             conn.close()
+            flash('Vehiculo registrado correctamente.', 'success')
             return redirect(url_for('main.dashboard'))
         except Exception as e:
             conn = obtener_conexion()

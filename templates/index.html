@@ -9,6 +9,19 @@
 </head>
 <body class="bg-light">
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="container mt-3">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ 'success' if category == 'success' else 'info' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
     <div class="mb-3 d-flex justify-content-between align-items-center">
         <div>
             <a href="{{ url_for('clientes.nuevo_cliente') }}" class="btn btn-success btn-sm">+ Registrar Cliente</a>
@@ -38,6 +51,45 @@
                 </p>
             </div>
         </div>
+
+        {% if metricas %}
+        <div class="row g-3 mb-4">
+            <div class="col-6 col-md-3">
+                <div class="card text-center shadow-sm"><div class="card-body"><h3 class="mb-0">{{ metricas.activas }}</h3><small class="text-muted">Órdenes activas</small></div></div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card text-center shadow-sm border-warning"><div class="card-body"><h3 class="mb-0 text-warning">{{ metricas.pendientes }}</h3><small class="text-muted">Pendientes</small></div></div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card text-center shadow-sm border-primary"><div class="card-body"><h3 class="mb-0 text-primary">{{ metricas.en_proceso }}</h3><small class="text-muted">En proceso</small></div></div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="card text-center shadow-sm border-success"><div class="card-body"><h3 class="mb-0 text-success">{{ metricas.finalizadas }}</h3><small class="text-muted">Finalizadas</small></div></div>
+            </div>
+        </div>
+        {% endif %}
+
+        <form method="GET" class="card card-body shadow-sm mb-3">
+            {% if mostrar_ocultos %}
+                <input type="hidden" name="ver_ocultos" value="1">
+            {% endif %}
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <input type="search" name="buscar" class="form-control" value="{{ busqueda or '' }}" placeholder="Buscar por número, chapa o vehículo">
+                </div>
+                <div class="col-md-4">
+                    <select name="estado" class="form-select">
+                        <option value="">Todos los estados</option>
+                        {% for opcion in ('Pendiente', 'En Proceso', 'Finalizado') %}
+                            <option value="{{ opcion }}" {% if estado == opcion %}selected{% endif %}>{{ opcion }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2 d-grid">
+                    <button type="submit" class="btn btn-dark">Buscar</button>
+                </div>
+            </div>
+        </form>
 
         <!-- Tarjeta con la tabla de órdenes -->
         <div class="card shadow-sm">
@@ -74,9 +126,21 @@
                                 <!-- Botones rápidos para cambiar estado -->
                                 <div class="btn-group ms-2" role="group">
                                     {% if not orden.oculto %}
-                                        <a href="{{ url_for('ordenes.cambiar_estado_orden', orden_id=orden.id, nuevo_estado='Pendiente') }}" class="btn btn-outline-warning btn-sm" title="Pendiente">⏳</a>
-                                        <a href="{{ url_for('ordenes.cambiar_estado_orden', orden_id=orden.id, nuevo_estado='En Proceso') }}" class="btn btn-outline-primary btn-sm" title="En Proceso">⚙️</a>
-                                        <a href="{{ url_for('ordenes.cambiar_estado_orden', orden_id=orden.id, nuevo_estado='Finalizado') }}" class="btn btn-outline-success btn-sm" title="Finalizado">✅</a>
+                                        <form action="{{ url_for('ordenes.cambiar_estado_orden', orden_id=orden.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                            <input type="hidden" name="nuevo_estado" value="Pendiente">
+                                            <button type="submit" class="btn btn-outline-warning btn-sm" title="Pendiente">⏳</button>
+                                        </form>
+                                        <form action="{{ url_for('ordenes.cambiar_estado_orden', orden_id=orden.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                            <input type="hidden" name="nuevo_estado" value="En Proceso">
+                                            <button type="submit" class="btn btn-outline-primary btn-sm" title="En Proceso">⚙️</button>
+                                        </form>
+                                        <form action="{{ url_for('ordenes.cambiar_estado_orden', orden_id=orden.id) }}" method="POST" class="d-inline">
+                                            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                            <input type="hidden" name="nuevo_estado" value="Finalizado">
+                                            <button type="submit" class="btn btn-outline-success btn-sm" title="Finalizado">✅</button>
+                                        </form>
                                     {% else %}
                                         <button class="btn btn-outline-secondary btn-sm" disabled title="No se puede modificar una orden archivada">🔒 Archivada</button>
                                     {% endif %}
@@ -87,9 +151,11 @@
                             <td>
                                 <div class="d-flex gap-1">
                                     <button class="btn btn-sm btn-info" onclick="verDetalle({{ orden.id }})" title="Ver detalle">👁️</button>
+                                    <a href="{{ url_for('ordenes.seguimiento_orden', id=orden.id) }}" target="_blank" class="btn btn-sm btn-outline-dark" title="Abrir seguimiento público">🔗</a>
                                     
                                     {% if not orden.oculto and orden.estado == 'Finalizado' %}
                                     <form action="{{ url_for('ordenes.ocultar_orden', id=orden.id) }}" method="POST" style="display:inline;" onsubmit="return confirmarArchivo()">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                                         <button type="submit" class="btn btn-sm btn-outline-secondary" title="Archivar orden">
                                             📦 Archivar
                                         </button>

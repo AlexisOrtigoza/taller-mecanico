@@ -21,6 +21,7 @@
                 {% endif %}
 
                 <form action="{{ url_for('clientes.nuevo_cliente') }}" method="POST">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                     
                     <!-- Sección Obligatoria -->
                     <h5 class="text-primary mb-3">Datos Obligatorios</h5>
