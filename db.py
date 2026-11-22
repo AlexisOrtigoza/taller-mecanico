@@ -1,19 +1,17 @@
 import psycopg2
+import os
+from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
 
-# Configuración de tu base de datos
-DB_HOST = "localhost"
-DB_NAME = "taller-mecanico"
-DB_USER = "postgres"
-DB_PASS = "931223"
-DB_PORT = "5432"
+# Cargar las variables de entorno desde el archivo .env
+load_dotenv()
 
 def obtener_conexion():
     conexion = psycopg2.connect(
-        host=DB_HOST,
-        database=DB_NAME,
-        user=DB_USER,
-        password=DB_PASS,
-        port=DB_PORT
+        host=os.getenv("DB_HOST", "localhost"),
+        database=os.getenv("DB_NAME", "taller-mecanico"),
+        user=os.getenv("DB_USER", "postgres"),
+        password=os.getenv("DB_PASS"),
+        port=os.getenv("DB_PORT", "5432")
     )
     return conexion
